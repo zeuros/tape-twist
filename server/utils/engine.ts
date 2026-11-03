@@ -1,7 +1,7 @@
 import { enforceRouting, ensureSinks } from './audio'
 import { Deck, type DeckState } from './deck'
 import { EQ_MIN, mixer } from './mixer'
-import { readJson, writeJson, type Evening, type FavItem } from './store'
+import { activeList, loadEvening, readJson, writeJson, type FavItem } from './store'
 
 /** Time we allow for loading the next item before its fade must start. */
 const PRELOAD_LEAD = 25 // s before the crossfade; a fresh Deezer page takes a few seconds to open
@@ -111,7 +111,7 @@ class Engine {
   }
 
   private async queue(): Promise<FavItem[]> {
-    return (await readJson<Evening>('evening.json', { title: '', startTime: '20:00', items: [] })).items
+    return activeList(await loadEvening(), this.currentId).items
   }
 
   private async neighbour(d: 1 | -1): Promise<FavItem | null> {

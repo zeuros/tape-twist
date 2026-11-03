@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { engine } from './engine'
 import { deezerTrack, searchCatalogs, soundcloudTrack } from './platforms'
-import { favsFile, PLATFORMS, readJson, updateEvening, writeJson, type FavCache, type FavItem } from './store'
+import { activeList, favsFile, PLATFORMS, readJson, updateEvening, writeJson, type FavCache, type FavItem } from './store'
 
 export interface GuestRequest {
   id: string
@@ -153,7 +153,8 @@ export function decide(requestId: string, action: 'approve' | 'reject') {
     r.status = action === 'approve' ? 'approved' : 'rejected'
     r.decidedAt = new Date().toISOString()
     if (action === 'approve') {
-      await updateEvening((ev) => {
+      await updateEvening((doc) => {
+        const ev = activeList(doc, engine.currentId)
         if (ev.items.some((i) => i.id === r.item.id)) return
         const cur = engine.currentId ? ev.items.findIndex((i) => i.id === engine.currentId) : -1
         let pos = cur < 0 ? ev.items.length : cur + 1

@@ -1,12 +1,13 @@
 import { guestId } from '../../utils/auth'
 import { engine } from '../../utils/engine'
 import { guestView, publicItem } from '../../utils/requests'
-import { loadEvening } from '../../utils/store'
+import { activeList, loadEvening } from '../../utils/store'
 
 // What guests see: now playing, what's next, and the request board. No controls.
 export default defineEventHandler(async (event) => {
   const me = guestId(event)
-  const [snap, ev, requests] = await Promise.all([engine.snapshot(), loadEvening(), guestView(me)])
+  const [snap, doc, requests] = await Promise.all([engine.snapshot(), loadEvening(), guestView(me)])
+  const ev = activeList(doc, snap.currentId)
   const i = snap.currentId ? ev.items.findIndex((x) => x.id === snap.currentId) : -1
   return {
     title: ev.title,

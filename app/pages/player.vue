@@ -22,10 +22,15 @@ interface EveningEntry extends FavItem {
   note?: string
   requestedBy?: string
 }
-interface Evening {
+interface Playlist {
+  id: string
   title: string
   startTime: string
   items: EveningEntry[]
+}
+interface Evening {
+  playlists: Playlist[]
+  open: string
   rev?: number
 }
 interface PlatformStatus {
@@ -166,7 +171,22 @@ watch(q, (v) => {
 })
 
 // ----------------------------------------------------------------- evening
-const evening = ref<Evening>({ title: 'Chill & feels', startTime: '20:00', items: [], rev: 0 })
+const doc = ref<Evening>({ playlists: [{ id: 'main', title: 'Chill & feels', startTime: '20:00', items: [] }], open: 'main', rev: 0 })
+/** The open playlist: the one being edited, where new songs land. */
+const evening = computed(() => doc.value.playlists.find((p) => p.id === doc.value.open) ?? doc.value.playlists[0])
+const listSec = (p: Playlist) => p.items.reduce((s, i) => s + (i.durationSec || 0), 0)
+function newPlaylist() {
+  const id = `pl-${Date.now().toString(36)}`
+  doc.value.playlists.push({ id, title: `Playlist ${doc.value.playlists.length + 1}`, startTime: evening.value.startTime, items: [] })
+  doc.value.open = id
+}
+function deletePlaylist(p: Playlist) {
+  if (doc.value.playlists.length < 2) return
+  if (p.items.length && !confirm(`Delete "${p.title}" and its ${p.items.length} songs?`)) return
+  const i = doc.value.playlists.indexOf(p)
+  doc.value.playlists.splice(i, 1)
+  doc.value.open = doc.value.playlists[Math.max(0, i - 1)].id
+}
 const inEvening = computed(() => new Set(evening.value.items.map((i) => i.id)))
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 const saved = ref(true)
@@ -176,12 +196,12 @@ const saved = ref(true)
 let applyingRemote = false
 function applyEvening(e: Evening) {
   applyingRemote = true
-  evening.value = e
+  doc.value = e
   nextTick(() => (applyingRemote = false))
 }
 
 watch(
-  evening,
+  doc,
   () => {
     if (applyingRemote) return
     saved.value = false
@@ -194,9 +214,9 @@ watch(
 async function saveEvening() {
   saveTimer = undefined
   try {
-    const r = await $fetch<Evening>('/api/evening', { method: 'PUT', body: evening.value })
+    const r = await $fetch<Evening>('/api/evening', { method: 'PUT', body: doc.value })
     applyingRemote = true
-    evening.value.rev = r.rev
+    doc.value.rev = r.rev
     nextTick(() => (applyingRemote = false))
   } catch (e: any) {
     // Someone else changed it first: take their version.
@@ -207,7 +227,7 @@ async function saveEvening() {
 }
 
 async function syncEvening(serverRev?: number) {
-  if (serverRev === undefined || serverRev === evening.value.rev || saveTimer || !saved.value) return
+  if (serverRev === undefined || serverRev === doc.value.rev || saveTimer || !saved.value) return
   applyEvening(await $fetch<Evening>('/api/evening'))
 }
 
@@ -909,77 +929,93 @@ onBeforeUnmount(() => {
 
       <!-- ------------------------------------------------ evening -->
       <section class="panel evening" :class="{ hidden: tab !== 'evening' }">
-        <div class="panel-head">
-          <input v-model="evening.title" class="ev-title" aria-label="Evening title">
+        <div class="pl-bar">
+          <h2>Playlists</h2>
           <small class="saved">{{ saved ? 'Saved' : 'Saving…' }}</small>
+          <button class="pl-new" title="New playlist" aria-label="New playlist" @click="newPlaylist">+</button>
         </div>
-        <div class="ev-meta">
-          <label>Starts <input v-model="evening.startTime" type="time"></label>
-          <span>{{ dur(totalSec) }} · ends ~{{ endClock }}</span>
-        </div>
+        <template v-for="pl in doc.playlists" :key="pl.id">
+          <button v-if="pl.id !== evening.id" class="pl-fold" :title="`Open ${pl.title}`" @click="doc.open = pl.id">
+            <span class="pl-chev">▸</span>
+            <strong>{{ pl.title }}</strong>
+            <span v-if="eng?.currentId && pl.items.some((x) => x.id === eng!.currentId)" class="pl-live" title="Playing from this playlist">♪</span>
+            <small>{{ pl.items.length }} · {{ dur(listSec(pl)) || '0:00' }}</small>
+          </button>
+          <div v-else class="pl-open">
+            <div class="panel-head">
+              <span class="pl-chev open">▾</span>
+              <input v-model="evening.title" class="ev-title" aria-label="Playlist title">
+              <button v-if="doc.playlists.length > 1" class="ghost sm" title="Delete this playlist" @click="deletePlaylist(pl)">🗑</button>
+            </div>
+            <div class="ev-meta">
+              <label>Starts <input v-model="evening.startTime" type="time"></label>
+              <span>{{ dur(totalSec) }} · ends ~{{ endClock }}</span>
+            </div>
 
-        <div v-if="totalSec" class="arc" aria-label="Mood arc over the evening">
-          <span
-            v-for="(it, i) in evening.items"
-            :key="it.id"
-            :class="`m-${it.mood || 'none'}`"
-            :style="{ flexGrow: Math.max(it.durationSec, 60) }"
-            :title="`${clock(schedule[i])} ${it.title}`"
-          />
-        </div>
+            <div v-if="totalSec" class="arc" aria-label="Mood arc over the evening">
+              <span
+                v-for="(it, i) in evening.items"
+                :key="it.id"
+                :class="`m-${it.mood || 'none'}`"
+                :style="{ flexGrow: Math.max(it.durationSec, 60) }"
+                :title="`${clock(schedule[i])} ${it.title}`"
+              />
+            </div>
 
-        <ol class="list ev-list">
-          <li
-            v-for="(it, i) in evening.items"
-            :key="it.id"
-            class="item ev"
-            :class="{ dragging: dragFrom === i, current: eng?.currentId === it.id }"
-            draggable="true"
-            @dragstart="dragFrom = i"
-            @dragover.prevent
-            @drop="onDrop(i)"
-            :data-i="i"
-          >
-            <span
-              class="handle"
-              title="Drag to reorder"
-              @pointerdown="handleDown($event, i)"
-              @pointermove="handleMove"
-              @pointerup="handleUp"
-              @pointercancel="handleUp"
-            >⠿</span>
-            <span class="time">{{ clock(schedule[i]) }}</span>
-            <button class="art" :title="`Play from ${it.title}`" @click="playNow(it)">
-              <img v-if="it.artwork" :src="it.artwork" alt="" loading="lazy">
-              <span class="play">▶</span>
-            </button>
-            <div class="meta">
-              <div class="title">{{ it.title }}</div>
-              <div class="sub">
-                <span class="badge" :class="it.platform">{{ it.platform === 'soundcloud' ? 'SC' : 'DZ' }}</span>
-                {{ it.artist }} · {{ dur(it.durationSec) }}
-                <span v-if="it.requestedBy" class="badge req">🙋 {{ it.requestedBy }}</span>
-              </div>
-              <div class="moods">
-                <button
-                  v-for="m in MOODS"
-                  :key="m.id"
-                  class="mood"
-                  :class="[`m-${m.id}`, { on: it.mood === m.id }]"
-                  @click="it.mood = m.id"
-                >
-                  {{ m.label }}
+            <ol class="list ev-list">
+              <li
+                v-for="(it, i) in evening.items"
+                :key="it.id"
+                class="item ev"
+                :class="{ dragging: dragFrom === i, current: eng?.currentId === it.id }"
+                draggable="true"
+                @dragstart="dragFrom = i"
+                @dragover.prevent
+                @drop="onDrop(i)"
+                :data-i="i"
+              >
+                <span
+                  class="handle"
+                  title="Drag to reorder"
+                  @pointerdown="handleDown($event, i)"
+                  @pointermove="handleMove"
+                  @pointerup="handleUp"
+                  @pointercancel="handleUp"
+                >⠿</span>
+                <span class="time">{{ clock(schedule[i]) }}</span>
+                <button class="art" :title="`Play from ${it.title}`" @click="playNow(it)">
+                  <img v-if="it.artwork" :src="it.artwork" alt="" loading="lazy">
+                  <span class="play">▶</span>
                 </button>
-              </div>
-            </div>
-            <div class="ops">
-              <button class="ghost sm" title="Move up" :disabled="i === 0" @click="move(i, -1)">↑</button>
-              <button class="ghost sm" title="Move down" :disabled="i === evening.items.length - 1" @click="move(i, 1)">↓</button>
-              <button class="ghost sm" title="Remove" @click="removeAt(i)">✕</button>
-            </div>
-          </li>
-          <li v-if="!evening.items.length" class="empty">Add favorites with + and arrange them here.</li>
-        </ol>
+                <div class="meta">
+                  <div class="title">{{ it.title }}</div>
+                  <div class="sub">
+                    <span class="badge" :class="it.platform">{{ it.platform === 'soundcloud' ? 'SC' : 'DZ' }}</span>
+                    {{ it.artist }} · {{ dur(it.durationSec) }}
+                    <span v-if="it.requestedBy" class="badge req">🙋 {{ it.requestedBy }}</span>
+                  </div>
+                  <div class="moods">
+                    <button
+                      v-for="m in MOODS"
+                      :key="m.id"
+                      class="mood"
+                      :class="[`m-${m.id}`, { on: it.mood === m.id }]"
+                      @click="it.mood = m.id"
+                    >
+                      {{ m.label }}
+                    </button>
+                  </div>
+                </div>
+                <div class="ops">
+                  <button class="ghost sm" title="Move up" :disabled="i === 0" @click="move(i, -1)">↑</button>
+                  <button class="ghost sm" title="Move down" :disabled="i === evening.items.length - 1" @click="move(i, 1)">↓</button>
+                  <button class="ghost sm" title="Remove" @click="removeAt(i)">✕</button>
+                </div>
+              </li>
+              <li v-if="!evening.items.length" class="empty">Add favorites with + and arrange them here.</li>
+            </ol>
+          </div>
+        </template>
       </section>
       <!-- ------------------------------------------------ booth -->
       <aside class="side" :class="{ hidden: tab !== 'booth' && tab !== 'requests' }">

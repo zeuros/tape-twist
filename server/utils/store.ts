@@ -51,16 +51,41 @@ export interface EveningEntry extends FavItem {
   requestedBy?: string
 }
 
-export interface Evening {
+export interface Playlist {
+  id: string
   title: string
   startTime: string // "HH:MM"
   items: EveningEntry[]
+}
+
+/** All playlists; `open` is the one being edited (new songs land there). */
+export interface Evening {
+  playlists: Playlist[]
+  open: string
   /** Incremented on every save; lets clients detect changes made elsewhere. */
   rev?: number
 }
 
-const EMPTY_EVENING: Evening = { title: 'Chill & feels', startTime: '20:00', items: [], rev: 0 }
-export const loadEvening = async () => ({ ...EMPTY_EVENING, ...(await readJson<Evening>('evening.json', EMPTY_EVENING)) })
+const newPlaylist = (title = 'Chill & feels'): Playlist => ({ id: 'main', title, startTime: '20:00', items: [] })
+
+/** Reads evening.json, migrating the old single-playlist shape ({ title, startTime, items }). */
+export async function loadEvening(): Promise<Evening> {
+  const raw = await readJson<any>('evening.json', null)
+  let playlists: Playlist[] = Array.isArray(raw?.playlists) ? raw.playlists : []
+  if (!playlists.length && raw && Array.isArray(raw.items)) {
+    playlists = [{ id: 'main', title: raw.title || 'Chill & feels', startTime: raw.startTime || '20:00', items: raw.items }]
+  }
+  if (!playlists.length) playlists = [newPlaylist()]
+  const open = playlists.some((p) => p.id === raw?.open) ? raw.open : playlists[0].id
+  return { playlists, open, rev: raw?.rev ?? 0 }
+}
+
+/** The playlist that drives playback: the one holding the current track (open one first), else the open one. */
+export function activeList(ev: Evening, currentId?: string | null): Playlist {
+  const open = ev.playlists.find((p) => p.id === ev.open) ?? ev.playlists[0]
+  if (!currentId || open.items.some((i) => i.id === currentId)) return open
+  return ev.playlists.find((p) => p.items.some((i) => i.id === currentId)) ?? open
+}
 
 let eveningLock: Promise<unknown> = Promise.resolve()
 /** Serialised read-modify-write of the evening; bumps rev. */
