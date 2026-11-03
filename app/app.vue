@@ -275,14 +275,11 @@ h2, .brand, .ev-title { font-weight: 800; letter-spacing: -.02em; }
 .mood.on.m-deep { background: var(--m-deep) !important; }
 .mood.on.m-winddown { background: var(--m-winddown) !important; }
 
-/* Booth: pads are the big orange tiles */
-.pad { border: 0; border-radius: 18px; background: var(--grad); box-shadow: var(--glow); }
-.pad .pad-label { color: var(--on-accent); font-weight: 600; opacity: .8; }
-.pad:nth-child(4n+2), .pad:nth-child(4n+4) { background: var(--panel-2); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
-.pad:nth-child(4n+2) .pad-label, .pad:nth-child(4n+4) .pad-label { color: var(--muted); }
-.pad:hover { filter: brightness(1.08); }
-.pad.live { background: #fff4e3; box-shadow: 0 0 0 3px var(--accent), 0 0 26px color-mix(in srgb, var(--accent) 60%, transparent); }
-.pad.live .pad-label { color: var(--on-accent); }
+/* Booth: pads are dark tiles; a playing pad lights up orange */
+.pad { border: 0; border-radius: 18px; background: var(--panel-2); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+.pad:hover { background: color-mix(in srgb, var(--accent) 10%, var(--panel-2)); border-color: transparent; }
+.pad.live { background: var(--grad); box-shadow: var(--glow), 0 0 26px color-mix(in srgb, var(--accent) 45%, transparent); }
+.pad.live .pad-label { color: var(--on-accent); font-weight: 600; }
 .hold { border: 0; border-radius: 18px; background: var(--panel-2); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
 .hold.on { background: var(--grad); color: var(--on-accent); box-shadow: var(--glow); }
 .hold.on small { color: var(--on-accent); }
