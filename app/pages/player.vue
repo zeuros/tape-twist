@@ -1501,8 +1501,10 @@ onBeforeUnmount(() => {
 
         <div class="transport">
           <button class="ghost round" title="Previous" :disabled="busy || !eng?.current" @click="command('prev')">⏮</button>
-          <button class="primary round" :title="eng?.status === 'playing' ? 'Pause' : 'Play'" :disabled="busy && eng?.status !== 'playing'" @click="togglePlay">
-            <i v-if="loadingItem && eng?.status !== 'playing'" class="spin" /><template v-else>{{ eng?.status === 'playing' ? '❚❚' : '▶' }}</template>
+          <button class="primary round" :class="{ disco: eng?.status === 'playing' }" :title="eng?.status === 'playing' ? 'Pause' : 'Play'" :disabled="busy && eng?.status !== 'playing'" @click="togglePlay">
+            <i v-if="loadingItem && eng?.status !== 'playing'" class="spin" />
+            <template v-else-if="eng?.status === 'playing'"><span class="disco-ball" aria-hidden="true">🪩</span><span class="disco-pause" aria-hidden="true">❚❚</span></template>
+            <template v-else>▶</template>
           </button>
           <button class="ghost round" title="Next" :disabled="busy || !eng?.next" @click="command('next')">⏭</button>
         </div>

@@ -168,6 +168,19 @@ button:disabled { cursor: default; opacity: .45; }
 .fading { color: var(--accent); }
 .transport { display: flex; align-items: center; gap: 8px; }
 .round { width: 40px; height: 40px; border-radius: 50%; padding: 0; display: grid; place-items: center; }
+/* Playing: the play button is a disco ball, swinging on its wire and throwing light; hover/focus shows pause. */
+.round.disco { position: relative; font-size: 22px; animation: disco-glow 1.6s ease-in-out infinite; }
+.round.disco > span { grid-area: 1 / 1; transition: opacity .15s; }
+.disco-ball { display: inline-block; transform-origin: 50% -30%; animation: disco-swing 2.4s ease-in-out infinite; }
+.disco-pause { opacity: 0; font-size: 14px; }
+.round.disco:hover .disco-ball, .round.disco:focus-visible .disco-ball { opacity: 0; }
+.round.disco:hover .disco-pause, .round.disco:focus-visible .disco-pause { opacity: 1; }
+@keyframes disco-swing { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(10deg); } }
+@keyframes disco-glow {
+  0%, 100% { box-shadow: 0 0 10px 2px color-mix(in srgb, var(--accent) 45%, transparent), 6px -4px 14px -2px rgba(120, 200, 255, .5); }
+  50% { box-shadow: 0 0 18px 5px color-mix(in srgb, var(--accent) 65%, transparent), -6px 4px 14px -2px rgba(255, 120, 220, .55); }
+}
+@media (prefers-reduced-motion: reduce) { .disco-ball, .round.disco { animation: none; } }
 .primary { background: var(--accent); color: #1a1208; border: 0; width: 48px; height: 48px; font-size: 16px; font-weight: 700; }
 .extras { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 12px; }
 .xfade small { opacity: .8; }
