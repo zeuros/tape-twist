@@ -273,6 +273,15 @@ export async function soundcloudTrack(nativeId: string): Promise<FavItem | null>
   })
 }
 
+/** SoundCloud's "related tracks" for a track (what its station would play next). */
+export async function soundcloudRelated(nativeId: string, nb = 30): Promise<FavItem[]> {
+  if (!/^\d+$/.test(nativeId)) return []
+  return withCreds('soundcloud', async (c) => {
+    const r = await scFetch(c, `/tracks/${nativeId}/related?limit=${nb}`).catch(() => null)
+    return ((r?.collection ?? []) as any[]).map((t) => scTrack(t))
+  })
+}
+
 /** Both catalogs, interleaved (a platform that fails or isn't connected is just left out). */
 export async function searchCatalogs(query: string, nb = 30): Promise<FavItem[]> {
   const [sc, dz] = await Promise.all(

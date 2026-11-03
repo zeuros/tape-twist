@@ -100,6 +100,20 @@ button:disabled { cursor: default; opacity: .45; }
 .empty { color: var(--muted); padding: 24px 8px; text-align: center; }
 .more { width: 100%; margin-top: 8px; }
 
+/* Ask Claude: one line (request + count + go), method chips under it */
+.ai-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.ai-prompt { flex: 1; min-width: 0; border: 0; border-radius: 999px; padding: 10px 14px; background: #1c1d21; box-shadow: inset 0 2px 4px rgba(0,0,0,.35); font-size: 14px; }
+.ai-count { flex: none; width: 52px; border: 0; border-radius: 999px; padding: 10px 6px; text-align: center; background: #1c1d21; box-shadow: inset 0 2px 4px rgba(0,0,0,.35); font-size: 14px; -moz-appearance: textfield; }
+.ai-count::-webkit-inner-spin-button, .ai-count::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.ai-prompt:focus, .ai-count:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: -1px; }
+.ai-go { flex: none; width: 40px; height: 40px; border: 0; border-radius: 50%; padding: 0; font-size: 18px; background: var(--grad); box-shadow: var(--glow); }
+.ai-go:disabled { opacity: .5; box-shadow: none; }
+.ai-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 12px; }
+.ai-methods { display: flex; gap: 4px; }
+.ai-methods button { border: 0; border-radius: 999px; padding: 4px 10px; font-size: 12px; background: var(--panel-2); color: var(--muted); }
+.ai-methods button.on { background: color-mix(in srgb, var(--accent) 22%, var(--panel-2)); color: var(--text); }
+.ai-status { flex: 1 1 200px; min-width: 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
+.ai-status.busy { color: var(--accent); }
 /* Playlists: horizontal tabs, dock-style: the open one is wide, the others squeeze to share the rest */
 .pl-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .pl-tabs { flex: 1; min-width: 0; display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: #1c1d21; box-shadow: inset 0 2px 4px rgba(0,0,0,.35); }

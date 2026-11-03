@@ -231,6 +231,50 @@ async function syncEvening(serverRev?: number) {
   applyEvening(await $fetch<Evening>('/api/evening'))
 }
 
+// ---------------------------------------------------------------- ask Claude
+// One line at the top of the playlist: Claude finds songs, they're added to that playlist.
+type MixMethod = 'pick' | 'dig' | 'favs'
+const MIX_METHODS: { id: MixMethod; label: string; title: string }[] = [
+  { id: 'pick', label: '🧠 Pick', title: 'Claude names songs from what it knows; each is searched on SoundCloud and Deezer (fast, sometimes not found)' },
+  { id: 'dig', label: '⛏️ Dig', title: 'Claude writes searches, the server gathers real tracks (+ SoundCloud related of the reference), Claude picks from them' },
+  { id: 'favs', label: '♥ Favs', title: 'Claude picks among your liked tracks' },
+]
+const aiPrompt = ref('')
+const aiCount = ref(Number(safeStorage('aiCount')) || 10)
+const aiMethod = ref<MixMethod>((safeStorage('aiMethod') as MixMethod | null) || 'pick')
+const aiBusy = ref(false)
+const aiStatus = ref('')
+watch(aiCount, (v) => safeStorage('aiCount', String(v)))
+watch(aiMethod, (v) => safeStorage('aiMethod', v))
+async function askClaude() {
+  const prompt = aiPrompt.value.trim()
+  if (!prompt || aiBusy.value) return
+  const target = evening.value
+  aiBusy.value = true
+  aiStatus.value = 'Claude is choosing…'
+  try {
+    const r = await $fetch<{ items: FavItem[]; missing: string[]; note: string; ms: number }>('/api/ai/mix', {
+      method: 'POST',
+      body: {
+        prompt,
+        count: Math.max(1, Math.min(40, aiCount.value || 10)),
+        method: aiMethod.value,
+        playlistTitle: target.title,
+        current: target.items.map((i) => ({ artist: i.artist, title: i.title })),
+      },
+    })
+    const pl = doc.value.playlists.find((p) => p.id === target.id) ?? evening.value
+    const have = new Set(pl.items.map((i) => i.id))
+    const added = r.items.filter((f) => !have.has(f.id))
+    pl.items.push(...added.map((f) => ({ ...f, mood: 'chill' })))
+    aiStatus.value = `+${added.length} in ${(r.ms / 1000).toFixed(0)} s${r.missing.length ? ` · not found: ${r.missing.join(', ')}` : ''}${r.note ? ` · ${r.note}` : ''}`
+  } catch (e: any) {
+    aiStatus.value = e?.data?.statusMessage || e?.message || 'Claude failed'
+  } finally {
+    aiBusy.value = false
+  }
+}
+
 function addToEvening(f: FavItem) {
   if (inEvening.value.has(f.id)) return
   evening.value.items.push({ ...f, mood: 'chill' })
@@ -1098,6 +1142,25 @@ onBeforeUnmount(() => {
           <input v-model="evening.title" class="ev-title" aria-label="Playlist title">
           <small class="saved">{{ saved ? 'Saved' : 'Saving…' }}</small>
           <button v-if="doc.playlists.length > 1" class="ghost sm" title="Delete this playlist" @click="deletePlaylist(evening)">🗑</button>
+        </div>
+        <form class="ai-row" @submit.prevent="askClaude">
+          <input
+            v-model="aiPrompt"
+            class="ai-prompt"
+            :disabled="aiBusy"
+            placeholder="Ask Claude: calm bass music for ambience, go around Kebuffeule (Iorie remix)"
+            aria-label="Ask Claude for songs"
+            enterkeyhint="send"
+            maxlength="300"
+          >
+          <input v-model.number="aiCount" class="ai-count" type="number" min="1" max="40" inputmode="numeric" aria-label="How many songs" title="How many songs">
+          <button class="ai-go" type="submit" :disabled="aiBusy || !aiPrompt.trim()" :title="aiBusy ? 'Claude is choosing…' : 'Add songs'">{{ aiBusy ? '⏳' : '✨' }}</button>
+        </form>
+        <div class="ai-meta">
+          <div class="ai-methods" role="group" aria-label="Method">
+            <button v-for="m in MIX_METHODS" :key="m.id" type="button" :class="{ on: aiMethod === m.id }" :title="m.title" @click="aiMethod = m.id">{{ m.label }}</button>
+          </div>
+          <small v-if="aiStatus" class="ai-status" :class="{ busy: aiBusy }">{{ aiStatus }}</small>
         </div>
         <div class="ev-meta">
           <label>Starts <input v-model="evening.startTime" type="time"></label>
