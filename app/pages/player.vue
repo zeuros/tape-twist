@@ -930,92 +930,95 @@ onBeforeUnmount(() => {
       <!-- ------------------------------------------------ evening -->
       <section class="panel evening" :class="{ hidden: tab !== 'evening' }">
         <div class="pl-bar">
-          <h2>Playlists</h2>
-          <small class="saved">{{ saved ? 'Saved' : 'Saving…' }}</small>
+          <div class="pl-tabs" role="tablist" aria-label="Playlists">
+            <button
+              v-for="pl in doc.playlists"
+              :key="pl.id"
+              class="pl-tab"
+              :class="{ on: pl.id === evening.id }"
+              role="tab"
+              :aria-selected="pl.id === evening.id"
+              :title="`${pl.title} · ${pl.items.length} songs · ${dur(listSec(pl)) || '0:00'}`"
+              @click="doc.open = pl.id"
+            >
+              <span v-if="eng?.currentId && pl.items.some((x) => x.id === eng!.currentId)" class="pl-live" title="Playing from this playlist">♪</span>
+              <span class="pl-name">{{ pl.title || 'Untitled' }}</span>
+            </button>
+          </div>
           <button class="pl-new" title="New playlist" aria-label="New playlist" @click="newPlaylist">+</button>
         </div>
-        <template v-for="pl in doc.playlists" :key="pl.id">
-          <button v-if="pl.id !== evening.id" class="pl-fold" :title="`Open ${pl.title}`" @click="doc.open = pl.id">
-            <span class="pl-chev">▸</span>
-            <strong>{{ pl.title }}</strong>
-            <span v-if="eng?.currentId && pl.items.some((x) => x.id === eng!.currentId)" class="pl-live" title="Playing from this playlist">♪</span>
-            <small>{{ pl.items.length }} · {{ dur(listSec(pl)) || '0:00' }}</small>
-          </button>
-          <div v-else class="pl-open">
-            <div class="panel-head">
-              <span class="pl-chev open">▾</span>
-              <input v-model="evening.title" class="ev-title" aria-label="Playlist title">
-              <button v-if="doc.playlists.length > 1" class="ghost sm" title="Delete this playlist" @click="deletePlaylist(pl)">🗑</button>
-            </div>
-            <div class="ev-meta">
-              <label>Starts <input v-model="evening.startTime" type="time"></label>
-              <span>{{ dur(totalSec) }} · ends ~{{ endClock }}</span>
-            </div>
+        <div class="panel-head">
+          <input v-model="evening.title" class="ev-title" aria-label="Playlist title">
+          <small class="saved">{{ saved ? 'Saved' : 'Saving…' }}</small>
+          <button v-if="doc.playlists.length > 1" class="ghost sm" title="Delete this playlist" @click="deletePlaylist(evening)">🗑</button>
+        </div>
+        <div class="ev-meta">
+          <label>Starts <input v-model="evening.startTime" type="time"></label>
+          <span>{{ dur(totalSec) }} · ends ~{{ endClock }}</span>
+        </div>
 
-            <div v-if="totalSec" class="arc" aria-label="Mood arc over the evening">
-              <span
-                v-for="(it, i) in evening.items"
-                :key="it.id"
-                :class="`m-${it.mood || 'none'}`"
-                :style="{ flexGrow: Math.max(it.durationSec, 60) }"
-                :title="`${clock(schedule[i])} ${it.title}`"
-              />
-            </div>
+        <div v-if="totalSec" class="arc" aria-label="Mood arc over the evening">
+          <span
+            v-for="(it, i) in evening.items"
+            :key="it.id"
+            :class="`m-${it.mood || 'none'}`"
+            :style="{ flexGrow: Math.max(it.durationSec, 60) }"
+            :title="`${clock(schedule[i])} ${it.title}`"
+          />
+        </div>
 
-            <ol class="list ev-list">
-              <li
-                v-for="(it, i) in evening.items"
-                :key="it.id"
-                class="item ev"
-                :class="{ dragging: dragFrom === i, current: eng?.currentId === it.id }"
-                draggable="true"
-                @dragstart="dragFrom = i"
-                @dragover.prevent
-                @drop="onDrop(i)"
-                :data-i="i"
-              >
-                <span
-                  class="handle"
-                  title="Drag to reorder"
-                  @pointerdown="handleDown($event, i)"
-                  @pointermove="handleMove"
-                  @pointerup="handleUp"
-                  @pointercancel="handleUp"
-                >⠿</span>
-                <span class="time">{{ clock(schedule[i]) }}</span>
-                <button class="art" :title="`Play from ${it.title}`" @click="playNow(it)">
-                  <img v-if="it.artwork" :src="it.artwork" alt="" loading="lazy">
-                  <span class="play">▶</span>
+        <ol class="list ev-list">
+          <li
+            v-for="(it, i) in evening.items"
+            :key="it.id"
+            class="item ev"
+            :class="{ dragging: dragFrom === i, current: eng?.currentId === it.id }"
+            draggable="true"
+            @dragstart="dragFrom = i"
+            @dragover.prevent
+            @drop="onDrop(i)"
+            :data-i="i"
+          >
+            <span
+              class="handle"
+              title="Drag to reorder"
+              @pointerdown="handleDown($event, i)"
+              @pointermove="handleMove"
+              @pointerup="handleUp"
+              @pointercancel="handleUp"
+            >⠿</span>
+            <span class="time">{{ clock(schedule[i]) }}</span>
+            <button class="art" :title="`Play from ${it.title}`" @click="playNow(it)">
+              <img v-if="it.artwork" :src="it.artwork" alt="" loading="lazy">
+              <span class="play">▶</span>
+            </button>
+            <div class="meta">
+              <div class="title">{{ it.title }}</div>
+              <div class="sub">
+                <span class="badge" :class="it.platform">{{ it.platform === 'soundcloud' ? 'SC' : 'DZ' }}</span>
+                {{ it.artist }} · {{ dur(it.durationSec) }}
+                <span v-if="it.requestedBy" class="badge req">🙋 {{ it.requestedBy }}</span>
+              </div>
+              <div class="moods">
+                <button
+                  v-for="m in MOODS"
+                  :key="m.id"
+                  class="mood"
+                  :class="[`m-${m.id}`, { on: it.mood === m.id }]"
+                  @click="it.mood = m.id"
+                >
+                  {{ m.label }}
                 </button>
-                <div class="meta">
-                  <div class="title">{{ it.title }}</div>
-                  <div class="sub">
-                    <span class="badge" :class="it.platform">{{ it.platform === 'soundcloud' ? 'SC' : 'DZ' }}</span>
-                    {{ it.artist }} · {{ dur(it.durationSec) }}
-                    <span v-if="it.requestedBy" class="badge req">🙋 {{ it.requestedBy }}</span>
-                  </div>
-                  <div class="moods">
-                    <button
-                      v-for="m in MOODS"
-                      :key="m.id"
-                      class="mood"
-                      :class="[`m-${m.id}`, { on: it.mood === m.id }]"
-                      @click="it.mood = m.id"
-                    >
-                      {{ m.label }}
-                    </button>
-                  </div>
-                </div>
-                <div class="ops">
-                  <button class="ghost sm" title="Move up" :disabled="i === 0" @click="move(i, -1)">↑</button>
-                  <button class="ghost sm" title="Move down" :disabled="i === evening.items.length - 1" @click="move(i, 1)">↓</button>
-                  <button class="ghost sm" title="Remove" @click="removeAt(i)">✕</button>
-                </div>
-              </li>
-              <li v-if="!evening.items.length" class="empty">Add favorites with + and arrange them here.</li>
-            </ol>
-          </div>
-        </template>
+              </div>
+            </div>
+            <div class="ops">
+              <button class="ghost sm" title="Move up" :disabled="i === 0" @click="move(i, -1)">↑</button>
+              <button class="ghost sm" title="Move down" :disabled="i === evening.items.length - 1" @click="move(i, 1)">↓</button>
+              <button class="ghost sm" title="Remove" @click="removeAt(i)">✕</button>
+            </div>
+          </li>
+          <li v-if="!evening.items.length" class="empty">Add favorites with + and arrange them here.</li>
+        </ol>
       </section>
       <!-- ------------------------------------------------ booth -->
       <aside class="side" :class="{ hidden: tab !== 'booth' && tab !== 'requests' }">

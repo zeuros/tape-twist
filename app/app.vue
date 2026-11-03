@@ -100,19 +100,17 @@ button:disabled { cursor: default; opacity: .45; }
 .empty { color: var(--muted); padding: 24px 8px; text-align: center; }
 .more { width: 100%; margin-top: 8px; }
 
-/* Playlists accordion: the open one is expanded, the others fold into a header row */
-.pl-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.pl-bar h2 { margin: 0; font-size: 15px; flex: 1; }
-.pl-new { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 0; padding: 0; font-size: 20px; line-height: 1; font-weight: 700; color: var(--on-accent); background: var(--grad); box-shadow: var(--glow); }
-.pl-fold { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; border-radius: 18px; padding: 12px 14px; margin-bottom: 8px; background: var(--panel-2); color: var(--text); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
-.pl-fold:hover { background: color-mix(in srgb, var(--accent) 10%, var(--panel-2)); }
-.pl-fold strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
-.pl-fold small { color: var(--muted); flex: none; }
-.pl-chev { color: var(--muted); flex: none; width: 12px; }
-.pl-chev.open { color: var(--accent); }
-.pl-live { color: var(--accent); flex: none; }
-.pl-open { margin-bottom: 8px; padding: 12px; border-radius: 20px; background: color-mix(in srgb, var(--panel-2) 45%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent); }
-.pl-open .panel-head { justify-content: flex-start; }
+/* Playlists: horizontal tabs, dock-style: the open one is wide, the others squeeze to share the rest */
+.pl-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.pl-tabs { flex: 1; min-width: 0; display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: #1c1d21; box-shadow: inset 0 2px 4px rgba(0,0,0,.35); }
+.pl-tab { flex: 1 1 0; min-width: 10px; display: flex; align-items: center; justify-content: safe center; gap: 4px; overflow: hidden; border: 0; border-radius: 999px; padding: 8px 6px; font-size: 13px; color: var(--muted); background: var(--panel-2); transition: flex-grow .25s ease, background .2s, color .2s; }
+.pl-tab:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
+.pl-tab.on { flex-grow: 4; min-width: min(55%, 9em); padding: 8px 12px; color: var(--on-accent); font-weight: 700; background: var(--grad); box-shadow: var(--glow); }
+.pl-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-tab:not(.on) .pl-name { text-overflow: clip; }
+.pl-live { flex: none; color: var(--accent); }
+.pl-tab.on .pl-live { color: var(--on-accent); }
+.pl-new { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 0; padding: 0; font-size: 20px; line-height: 1; font-weight: 700; color: var(--on-accent); background: var(--grad); box-shadow: var(--glow); }
 .ev-title { flex: 1; min-width: 0; background: transparent; border: 0; border-radius: 6px; font-size: 17px; font-weight: 700; padding: 2px 4px; }
 .saved { color: var(--muted); }
 .ev-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; color: var(--muted); margin-bottom: 10px; }
