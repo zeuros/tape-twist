@@ -173,7 +173,25 @@ button:disabled { cursor: default; opacity: .45; }
 .pad.live { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent), 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent); }
 .pad-emoji { font-size: 28px; line-height: 1; }
 .pad-label { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.15; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.holds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.holds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+@media (max-width: 520px) { .holds { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.pad-wrap { position: relative; display: grid; min-width: 0; }
+.pad-wrap .pad { min-width: 0; }
+.pad-del { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; font-size: 11px; line-height: 1; color: var(--muted); background: rgba(0,0,0,.35); }
+.pad-del:hover { color: var(--text); background: rgba(0,0,0,.6); }
+.pad.rec { touch-action: none; -webkit-touch-callout: none; }
+.voice-seg { margin-top: 8px; }
+/* XY pad: a touch square, filter on x, resonance + echo on y */
+.xy { position: relative; margin-top: 12px; aspect-ratio: 16 / 10; border-radius: 18px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: crosshair;
+  background: radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%), linear-gradient(90deg, color-mix(in srgb, var(--accent) 14%, var(--panel-2)), var(--panel-2) 45% 55%, color-mix(in srgb, var(--accent-2) 14%, var(--panel-2)));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), inset 0 0 0 1px var(--line); }
+.xy::before { content: ''; position: absolute; inset: 0 45%; border-inline: 1px dashed color-mix(in srgb, var(--muted) 35%, transparent); pointer-events: none; }
+.xy.on { box-shadow: var(--glow), inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent); }
+.xy span { position: absolute; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; pointer-events: none; }
+.xy-l { left: 10px; bottom: 8px; }
+.xy-r { right: 10px; bottom: 8px; }
+.xy-t { left: 50%; top: 8px; transform: translateX(-50%); white-space: nowrap; }
+.xy .xy-dot { width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; background: var(--grad); box-shadow: var(--glow), 0 0 30px color-mix(in srgb, var(--accent) 60%, transparent); }
 .hold { border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 20px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .hold span { font-size: 13px; }
 .hold small { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }

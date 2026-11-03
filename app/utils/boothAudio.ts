@@ -5,15 +5,23 @@
  *    what changes it — echo, EQ, colour, duck (these respond within ~60 ms);
  *  - fx context (lowest latency): pads and the mic voice, added on top (instant).
  *
- *   <audio> ─┬──────────────────────────────┬─▶ EQ ─┬─ dry ────────────────┬─▶ duck ─▶ limiter ─▶ out
- *            └─ echo send ─▶ ping-pong delay ┘      └─ colour ─▶ wet (+noise)┘
+ *   <audio> ─▶ brake ─┬──────────────────────────────┬─▶ EQ ─▶ XY filter ─┬─ dry ────────────────┬─▶ duck ─▶ limiter ─▶ out
+ *    (tape-stop delay) └─ echo send ─▶ ping-pong delay ┘                    └─ colour ─▶ wet (+noise)┘
  *
  *   fx context:                          pads ─▶ pad gain ─────────────────────────┬─▶ limiter ─▶ out
- *   mic (talkover, this device only) ─▶ voice cleanup ─▶ feedback notches ─▶ gate ─┤
+ *   mic (talkover, this device only) ─▶ cleanup ─▶ notches ─▶ voice preset ─▶ gate ─┤
+ *                                       (tannoy / robot / chipmunk / monster)       │
  *                                       slapback + funfair reverb (convolver) ◀───┘
  */
 
 export type ColorPreset = 'off' | 'radio' | 'phone' | 'vinyl'
+export type VoicePreset = 'tannoy' | 'robot' | 'chipmunk' | 'monster'
+export const VOICE_PRESETS: VoicePreset[] = ['tannoy', 'robot', 'chipmunk', 'monster']
+/** XY pad position, 0..1 both ways (x: low-pass ← clean → high-pass; y: resonance + echo). */
+export interface XY {
+  x: number
+  y: number
+}
 export interface Eq {
   low: number
   mid: number
@@ -33,6 +41,8 @@ const MUSIC_LATENCY = 0.06
 const EQ_MIN = -26 // slider bottom = kill (-40 dB)
 const ECHO_DELAY = 0.375
 const ECHO_FEEDBACK = 0.55
+const BRAKE_SEC = 1.2 // turntable losing power: full speed to standstill
+const SPINUP_SEC = 0.35 // back to live, faster than real time
 const dbToGain = (db: number) => Math.pow(10, db / 20)
 
 interface Preset {
@@ -78,6 +88,13 @@ export class BoothAudio {
   private noise: AudioBufferSourceNode | null = null
   private wetSum: GainNode
   private duck: GainNode
+  private brakeDelay: DelayNode
+  private brakeGain: GainNode
+  private braking = false
+  private djLp: BiquadFilterNode
+  private djHp: BiquadFilterNode
+  private echoFb: GainNode[] = []
+  private xyEcho = 0
   private padGain: GainNode
   private out: GainNode
 
@@ -88,6 +105,10 @@ export class BoothAudio {
   private notches: BiquadFilterNode[] = []
   private nextNotch = 0
   private analyser: AnalyserNode
+  private presetGains = {} as Record<VoicePreset, GainNode>
+  private slapOut: GainNode
+  private verbOut: GainNode
+  private voicePreset: VoicePreset = 'tannoy'
   private mic: MediaStream | null = null
   private micSrc: MediaStreamAudioSourceNode | null = null
   private micPending: Promise<void> | null = null
@@ -117,13 +138,21 @@ export class BoothAudio {
     const src = (this.musicIn = gain())
     ctx.createMediaElementSource(el).connect(src)
 
+    // Tape stop: a delay whose length grows ever faster slows the music down to a standstill
+    // (and lowers its pitch with it); shrinking it back to 0 plays catch-up, then it's live again.
+    this.brakeDelay = ctx.createDelay(2)
+    this.brakeDelay.delayTime.value = 0
+    this.brakeGain = gain()
+    const head = gain()
+    src.connect(this.brakeDelay).connect(this.brakeGain).connect(head)
+
     // Music sum: the stream plus the echo returns.
     const music = gain()
-    src.connect(music)
+    head.connect(music)
 
     // Ping-pong echo: left repeats feed the right line and vice versa, darker and thinner each time.
     this.echoSend = gain(0)
-    src.connect(this.echoSend)
+    head.connect(this.echoSend)
     const split = ctx.createChannelSplitter(2)
     this.echoSend.connect(split)
     const merge = ctx.createChannelMerger(2)
@@ -142,6 +171,7 @@ export class BoothAudio {
       hp.type = 'highpass'
       hp.frequency.value = 250
       const fb = gain(ECHO_FEEDBACK)
+      this.echoFb.push(fb)
       lines[from]!.connect(lp).connect(hp).connect(fb).connect(lines[to]!)
     }
     merge.connect(music)
@@ -158,14 +188,18 @@ export class BoothAudio {
       return b
     })
     music.connect(this.eq[0]!).connect(this.eq[1]!).connect(this.eq[2]!)
+    // XY pad: DJ filter (low-pass one way, high-pass the other), wide open when idle.
+    this.djLp = biquad(ctx, 'lowpass', 20000)
+    this.djHp = biquad(ctx, 'highpass', 10)
+    this.eq[2]!.connect(this.djLp).connect(this.djHp)
 
     // Colour: dry/wet crossfade; the wet path is mono-ish → filters → drive (+ crackle and hiss).
     this.duck = gain()
     this.dry = gain(1)
     this.wet = gain(0)
-    this.eq[2]!.connect(this.dry).connect(this.duck)
+    this.djHp.connect(this.dry).connect(this.duck)
     this.colorIn = gain()
-    this.eq[2]!.connect(this.colorIn)
+    this.djHp.connect(this.colorIn)
     const cSplit = ctx.createChannelSplitter(2)
     this.colorIn.connect(cSplit)
     this.colorMerge = ctx.createChannelMerger(2)
@@ -218,7 +252,34 @@ export class BoothAudio {
     this.voiceLevel = gain(1, fx)
     let node: AudioNode = this.voiceHead.connect(hp1).connect(hp2)
     for (const n of this.notches) node = node.connect(n)
-    node.connect(presence).connect(top).connect(comp).connect(this.voiceGate).connect(this.voiceLevel)
+    node.connect(presence).connect(top).connect(comp)
+    // Voice presets, crossfaded: only the chosen one is open.
+    const presetsOut = gain(1, fx)
+    for (const p of VOICE_PRESETS) {
+      this.presetGains[p] = gain(p === 'tannoy' ? 1 : 0, fx)
+      this.presetGains[p].connect(presetsOut)
+    }
+    comp.connect(this.presetGains.tannoy)
+    // Robot: ring modulation (voice × 60 Hz sine) into a short metallic comb.
+    const ring = gain(0, fx)
+    const carrier = fx.createOscillator()
+    carrier.frequency.value = 60
+    carrier.connect(ring.gain)
+    carrier.start()
+    const comb = fx.createDelay(0.05)
+    comb.delayTime.value = 0.008
+    const combFb = gain(0.55, fx)
+    comp.connect(ring).connect(comb).connect(combFb).connect(comb)
+    ring.connect(this.presetGains.robot)
+    comb.connect(this.presetGains.robot)
+    // Chipmunk and monster: pitch shifted up a fifth / down a tritone (+ chest).
+    const up = pitchShifter(fx, 7)
+    comp.connect(up.input)
+    up.output.connect(this.presetGains.chipmunk)
+    const down = pitchShifter(fx, -6)
+    comp.connect(down.input)
+    down.output.connect(biquad(fx, 'lowshelf', 220, Math.SQRT1_2, 7)).connect(this.presetGains.monster)
+    presetsOut.connect(this.voiceGate).connect(this.voiceLevel)
     this.voiceLevel.connect(fxOut) // dry
     // Slapback: the tannoy bouncing off the stalls.
     const slap = fx.createDelay(1)
@@ -227,20 +288,21 @@ export class BoothAudio {
     const slapTone = biquad(fx, 'lowpass', 3000)
     this.voiceLevel.connect(slap)
     slap.connect(slapTone).connect(slapFb).connect(slap)
-    const slapOut = gain(0.35, fx)
+    const slapOut = (this.slapOut = gain(0.35, fx))
     slapTone.connect(slapOut).connect(fxOut)
     // Big bright plate-ish reverb.
     const verb = fx.createConvolver()
     verb.buffer = funfairReverb(fx)
-    const verbOut = gain(0.55, fx)
+    const verbOut = (this.verbOut = gain(0.55, fx))
     this.voiceLevel.connect(verb)
     slapOut.connect(verb)
     verb.connect(verbOut).connect(fxOut)
-    // Larsen watch: looks at the voice before the effects.
+    // Larsen watch: looks at the voice before the presets (a shifted pitch would put the
+    // notch on the wrong frequency). Only read while Talkover is held.
     this.analyser = fx.createAnalyser()
     this.analyser.fftSize = 4096
     this.analyser.smoothingTimeConstant = 0
-    this.voiceGate.connect(this.analyser)
+    comp.connect(this.analyser)
   }
 
   resume() {
@@ -377,7 +439,65 @@ export class BoothAudio {
   }
 
   private updateEcho() {
-    this.glide(this.echoSend.gain, this.echoHeld || this.echoOutOn ? 1 : 0, 0.015)
+    this.glide(this.echoSend.gain, Math.max(this.echoHeld || this.echoOutOn ? 1 : 0, this.xyEcho), 0.015)
+  }
+
+  // --------------------------------------------------------- XY and brake
+
+  /** XY pad: x sweeps a low-pass (left) or high-pass (right); y adds resonance and echo. null = let go. */
+  setXY(xy: XY | null) {
+    let lp = 20000
+    let hp = 10
+    let lpQ = Math.SQRT1_2
+    let hpQ = Math.SQRT1_2
+    this.xyEcho = 0
+    let fb = ECHO_FEEDBACK
+    if (xy) {
+      const q = Math.SQRT1_2 + xy.y * 8
+      if (xy.x < 0.45) {
+        lp = 150 * Math.pow(20000 / 150, xy.x / 0.45)
+        lpQ = q
+      } else if (xy.x > 0.55) {
+        hp = 20 * Math.pow(6000 / 20, (xy.x - 0.55) / 0.45)
+        hpQ = q
+      }
+      this.xyEcho = xy.y * 0.8
+      fb = ECHO_FEEDBACK + xy.y * 0.2
+    }
+    const tc = xy ? 0.015 : 0.05
+    this.glide(this.djLp.frequency, lp, tc)
+    this.glide(this.djHp.frequency, hp, tc)
+    this.glide(this.djLp.Q, lpQ, tc)
+    this.glide(this.djHp.Q, hpQ, tc)
+    for (const g of this.echoFb) this.glide(g.gain, fb, tc)
+    this.updateEcho()
+  }
+
+  /** Tape stop while held; on release it spins back up and is live (in sync) again. */
+  setBrake(on: boolean) {
+    if (on === this.braking) return
+    this.braking = on
+    const t = this.ctx.currentTime
+    const d = this.brakeDelay.delayTime
+    const g = this.brakeGain.gain
+    const from = d.value
+    d.cancelScheduledValues(t)
+    g.cancelScheduledValues(t)
+    g.setValueAtTime(g.value, t)
+    if (on) {
+      // delay = s²/2D: its growth rate climbs from 0 to 1, so the speed (1 − rate) falls from 1 to 0.
+      const n = 128
+      const curve = Float32Array.from({ length: n }, (_, i) => {
+        const s = (i / (n - 1)) * BRAKE_SEC
+        return from + (s * s) / (2 * BRAKE_SEC)
+      })
+      d.setValueCurveAtTime(curve, t, BRAKE_SEC)
+      g.setTargetAtTime(0, t + BRAKE_SEC * 0.7, 0.08)
+    } else {
+      d.setValueAtTime(from, t)
+      d.linearRampToValueAtTime(0, t + SPINUP_SEC)
+      g.linearRampToValueAtTime(1, t + 0.06)
+    }
   }
 
   setPadVolume(v: number) {
@@ -442,6 +562,17 @@ export class BoothAudio {
   }
 
   // --------------------------------------------------------------- voice
+
+  /** Talkover voice character (this device only). */
+  setVoicePreset(p: VoicePreset) {
+    if (!VOICE_PRESETS.includes(p)) return
+    this.voicePreset = p
+    for (const k of VOICE_PRESETS) this.glide(this.presetGains[k].gain, k === p ? 1 : 0, 0.03, this.fx)
+    // Less tannoy room on the robot, a little less on the shifted voices (they're busy already).
+    const [slap, verb] = ({ tannoy: [0.35, 0.55], robot: [0.12, 0.25], chipmunk: [0.25, 0.4], monster: [0.25, 0.45] } as const)[p]
+    this.glide(this.slapOut.gain, slap, 0.03, this.fx)
+    this.glide(this.verbOut.gain, verb, 0.03, this.fx)
+  }
 
   setVoiceVolume(v: number) {
     this.glide(this.voiceLevel.gain, v, 0.02, this.fx)
@@ -532,6 +663,46 @@ export class BoothAudio {
 }
 
 const MAX_NOTCHES = 6
+
+/**
+ * Pitch shifter built from plain nodes: two delay lines whose length sweeps at a constant
+ * rate (that rate is the speed change), each faded in and out, half a cycle apart, so one
+ * is always mid-sweep while the other jumps back. ~0.1 s of delay: fine for a voice.
+ */
+function pitchShifter(ctx: AudioContext, semitones: number) {
+  const ratio = Math.pow(2, semitones / 12)
+  const win = 0.1
+  const period = win / Math.abs(1 - ratio)
+  const len = Math.max(2, Math.round(period * ctx.sampleRate))
+  // Channel 0: delay sweep (shrinking for up, growing for down); channel 1: fade window.
+  const buf = ctx.createBuffer(2, len, ctx.sampleRate)
+  const sweep = buf.getChannelData(0)
+  const fade = buf.getChannelData(1)
+  for (let i = 0; i < len; i++) {
+    const ph = i / len
+    sweep[i] = 0.005 + win * (ratio > 1 ? 1 - ph : ph)
+    fade[i] = Math.sin(Math.PI * ph)
+  }
+  const input = ctx.createGain()
+  const output = ctx.createGain()
+  const t = ctx.currentTime + 0.05
+  for (const offset of [0, period / 2]) {
+    const d = ctx.createDelay(win + 0.05)
+    d.delayTime.value = 0
+    const g = ctx.createGain()
+    g.gain.value = 0
+    const lfo = ctx.createBufferSource()
+    lfo.buffer = buf
+    lfo.loop = true
+    const split = ctx.createChannelSplitter(2)
+    lfo.connect(split)
+    split.connect(d.delayTime, 0)
+    split.connect(g.gain, 1)
+    lfo.start(t, offset)
+    input.connect(d).connect(g).connect(output)
+  }
+  return { input, output }
+}
 
 function biquad(ctx: BaseAudioContext, type: BiquadFilterType, f: number, q = Math.SQRT1_2, gainDb = 0) {
   const b = ctx.createBiquadFilter()

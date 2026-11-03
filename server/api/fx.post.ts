@@ -3,10 +3,12 @@ import { engine } from '../utils/engine'
 import { mixer } from '../utils/mixer'
 
 interface FxCommand {
-  action: 'eq' | 'color' | 'duck' | 'padVolume' | 'talkover' | 'echo' | 'echoOut' | 'pad' | 'stopPads'
+  action: 'eq' | 'color' | 'duck' | 'padVolume' | 'talkover' | 'echo' | 'brake' | 'xy' | 'echoOut' | 'pad' | 'stopPads'
   eq?: { low?: number; mid?: number; high?: number }
   color?: ColorPreset
   value?: number
+  x?: number
+  y?: number
   on?: boolean
   id?: string
   /** The page that sent it: it already applied the change, so it skips its own echo. */
@@ -33,6 +35,8 @@ export default defineEventHandler(async (event) => {
     case 'padVolume': await booth.set({ padVolume: num(c.value, 0, 1.5) }, from); break
     case 'talkover': booth.hold('talkover', !!c.on, from); break
     case 'echo': booth.hold('echo', !!c.on, from); break
+    case 'brake': booth.hold('brake', !!c.on, from); break
+    case 'xy': booth.setXY(c.on === false ? null : { x: num(c.x, 0, 1), y: num(c.y, 0, 1) }, from); break
     case 'echoOut':
       booth.echoOut(from)
       await engine.echoOut()

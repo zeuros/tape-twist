@@ -1,8 +1,9 @@
 import { execFile } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { readJson, writeJson } from './store'
+import { DATA_DIR, readJson, writeJson } from './store'
 
 /**
  * Booth state hub. The effects (pads, colour, echo, talkover, EQ) are applied by each
@@ -12,6 +13,10 @@ import { readJson, writeJson } from './store'
  */
 
 export const PADS_DIR = resolve(process.env.PADS_DIR || 'pads')
+/** Pads recorded from the booth mic: private, next to the rest of the evening's data. */
+export const REC_DIR = join(DATA_DIR, 'pads')
+const REC_LIST = 'recorded-pads.json'
+const REC_MAX_SEC = 4
 const HOLD_TIMEOUT = 6000 // a held button must be refreshed within this (lost touch-up safety)
 const run = promisify(execFile)
 
@@ -31,6 +36,9 @@ export interface BoothState {
   padVolume: number
   talkover: boolean
   echo: boolean
+  brake: boolean
+  /** XY filter pad while a finger is on it, else null. */
+  xy: { x: number; y: number } | null
   pads: string[] // playing now
 }
 
@@ -40,19 +48,24 @@ export interface PadInfo {
   label: string
   file: string
   durationSec: number
+  /** Recorded from the booth mic (can be deleted). */
+  recorded?: boolean
 }
+type PadEntry = Omit<PadInfo, 'durationSec'>
 
 export type BoothEvent =
   | { type: 'state'; state: BoothState; from?: string }
   | { type: 'pad'; id: string; on: boolean; from?: string }
   | { type: 'stopPads'; from?: string }
   | { type: 'echoOut'; from?: string }
+  | { type: 'padsChanged' }
 
 type Persisted = Pick<BoothState, 'eq' | 'color' | 'duckDb' | 'padVolume'>
 
 class Booth {
   private s: Persisted = { eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: 10, padVolume: 0.8 }
-  private holds = { talkover: 0, echo: 0 }
+  private holds = { talkover: 0, echo: 0, brake: 0, xy: 0 }
+  private xy: { x: number; y: number } | null = null
   private holdTimers: Record<string, ReturnType<typeof setTimeout>> = {}
   private playing = new Map<string, ReturnType<typeof setTimeout>>()
   private subs = new Set<(e: BoothEvent) => void>()
@@ -72,6 +85,8 @@ class Booth {
       ...this.s,
       talkover: now < this.holds.talkover,
       echo: now < this.holds.echo,
+      brake: now < this.holds.brake,
+      xy: now < this.holds.xy ? this.xy : null,
       pads: [...this.playing.keys()],
     }
   }
@@ -103,12 +118,21 @@ class Booth {
   }
 
   /** Hold buttons: on=true is re-sent every 2 s while held; released after 6 s of silence. */
-  hold(name: 'talkover' | 'echo', on: boolean, from?: string) {
+  hold(name: 'talkover' | 'echo' | 'brake', on: boolean, from?: string) {
     const was = Date.now() < this.holds[name]
     this.holds[name] = on ? Date.now() + HOLD_TIMEOUT : 0
     clearTimeout(this.holdTimers[name])
     if (on) this.holdTimers[name] = setTimeout(() => this.emitState(), HOLD_TIMEOUT + 50)
     if (was !== on) this.emitState(from)
+  }
+
+  /** XY pad moved (or let go: null). Held like the buttons, so a lost touch-up can't stick. */
+  setXY(xy: { x: number; y: number } | null, from?: string) {
+    this.xy = xy
+    this.holds.xy = xy ? Date.now() + HOLD_TIMEOUT : 0
+    clearTimeout(this.holdTimers.xy)
+    if (xy) this.holdTimers.xy = setTimeout(() => this.emitState(), HOLD_TIMEOUT + 50)
+    this.emitState(from)
   }
 
   async pad(id: string, on: boolean, from?: string) {
@@ -137,15 +161,20 @@ class Booth {
     this.emit({ type: 'echoOut', from })
   }
 
-  /** Pads from pads/pads.json, with their length (needed to know when they stop). */
+  /** Where a pad's audio file is. */
+  padPath(p: PadInfo) {
+    return join(p.recorded ? REC_DIR : PADS_DIR, p.file)
+  }
+
+  /** Built-in pads (pads/pads.json) then recorded ones, with their length (needed to know when they stop). */
   pads() {
     this.padList ??= (async () => {
-      const list = JSON.parse(await readFile(join(PADS_DIR, 'pads.json'), 'utf8')) as PadInfo[]
+      const builtIn = JSON.parse(await readFile(join(PADS_DIR, 'pads.json'), 'utf8')) as PadEntry[]
+      const recorded = (await readJson<PadEntry[]>(REC_LIST, [])).map((p) => ({ ...p, recorded: true }))
       const out: PadInfo[] = []
-      for (const p of list) {
+      for (const p of [...builtIn, ...recorded]) {
         try {
-          const { stdout } = await run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', join(PADS_DIR, p.file)])
-          const d = Number.parseFloat(stdout)
+          const d = await probeDuration(this.padPath(p as PadInfo))
           if (d > 0) out.push({ ...p, durationSec: d })
         } catch (e) {
           console.error('[pads] cannot read', p.file, e)
@@ -158,6 +187,62 @@ class Booth {
     })
     return this.padList
   }
+
+  private recLock: Promise<unknown> = Promise.resolve()
+  private editRecorded(fn: (list: PadEntry[]) => Promise<PadEntry[]>) {
+    const p = this.recLock.then(async () => {
+      await writeJson(REC_LIST, await fn(await readJson<PadEntry[]>(REC_LIST, [])))
+      this.padList = null
+      this.emit({ type: 'padsChanged' })
+    })
+    this.recLock = p.catch(() => {})
+    return p
+  }
+
+  /**
+   * A pad recorded on a phone (WebM/Opus, MP4/AAC…): cut to 4 s, silence trimmed at both
+   * ends, mono MP3. Throws if nothing audible is left.
+   */
+  async addRecorded(audio: Buffer, label: string) {
+    const id = `rec-${Date.now().toString(36)}`
+    await mkdir(REC_DIR, { recursive: true })
+    const src = join(tmpdir(), `evening-${id}.in`)
+    const out = join(REC_DIR, `${id}.mp3`)
+    const trim = 'silenceremove=start_periods=1:start_threshold=-42dB:start_silence=0.03'
+    try {
+      await writeFile(src, audio, { mode: 0o600 })
+      await run('ffmpeg', [
+        '-v', 'error', '-y', '-i', src, '-t', String(REC_MAX_SEC), '-ac', '1',
+        '-af', `${trim},areverse,${trim},areverse,afade=t=in:d=0.01`,
+        '-c:a', 'libmp3lame', '-b:a', '128k', `${out}.tmp.mp3`,
+      ])
+      if (!((await probeDuration(`${out}.tmp.mp3`).catch(() => 0)) > 0.05)) throw new Error('Nothing audible was recorded')
+      await rename(`${out}.tmp.mp3`, out)
+    } finally {
+      await rm(src, { force: true })
+      await rm(`${out}.tmp.mp3`, { force: true })
+    }
+    const entry: PadEntry = { id, emoji: '🎤', label: label.trim().slice(0, 30) || 'My pad', file: `${id}.mp3` }
+    await this.editRecorded(async (list) => [...list, entry])
+    return entry
+  }
+
+  async deleteRecorded(id: string) {
+    let found = false
+    await this.editRecorded(async (list) => {
+      const p = list.find((x) => x.id === id)
+      if (!p) return list
+      found = true
+      await rm(join(REC_DIR, p.file), { force: true })
+      return list.filter((x) => x !== p)
+    })
+    return found
+  }
+}
+
+async function probeDuration(file: string) {
+  const { stdout } = await run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file])
+  return Number.parseFloat(stdout)
 }
 
 export const booth = new Booth()

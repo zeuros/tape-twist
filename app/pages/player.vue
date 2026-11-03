@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ColorPreset } from '~/utils/boothAudio'
+import type { ColorPreset, VoicePreset, XY } from '~/utils/boothAudio'
 import type { LiveAudio, SyncInfo } from '~/utils/liveAudio'
 type Platform = 'soundcloud' | 'deezer'
 interface FavItem {
@@ -412,6 +412,7 @@ function startListening() {
   if (!a) return
   if (!audio) {
     audio = new BoothAudio(a) // inside the tap: browsers only start audio after a gesture
+    audio.setVoicePreset(voicePreset.value)
     applyBooth()
     audio.loadPads(pads.value)
   }
@@ -491,6 +492,8 @@ interface Booth {
   padVolume: number
   talkover: boolean
   echo: boolean
+  brake: boolean
+  xy: XY | null
   pads: string[]
 }
 type BoothEvent =
@@ -498,15 +501,17 @@ type BoothEvent =
   | { type: 'pad'; id: string; on: boolean; from?: string }
   | { type: 'stopPads'; from?: string }
   | { type: 'echoOut'; from?: string }
+  | { type: 'padsChanged'; from?: string }
 interface Pad {
   id: string
   emoji: string
   label: string
   durationSec?: number
+  recorded?: boolean
 }
 const pads = ref<Pad[]>([])
 const fxError = ref('')
-const booth = ref<Booth>({ eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: 10, padVolume: 0.8, talkover: false, echo: false, pads: [] })
+const booth = ref<Booth>({ eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: 10, padVolume: 0.8, talkover: false, echo: false, brake: false, xy: null, pads: [] })
 const clientId = Math.random().toString(36).slice(2)
 let eqEditedAt = 0
 let events: EventSource | null = null
@@ -533,6 +538,7 @@ function connectBooth() {
   events.onmessage = (m) => {
     const e = JSON.parse(m.data) as BoothEvent
     if (e.type === 'state') return setBooth(e.state)
+    if (e.type === 'padsChanged') return void reloadPads()
     if (e.from === clientId) return // already played here
     if (e.type === 'pad') void audio?.pad(e.id, e.on)
     else if (e.type === 'stopPads') audio?.stopPads()
@@ -545,6 +551,8 @@ const liveLag = () => live?.lag() ?? 3
 
 /** Hold buttons pressed here count at once, before the server confirms. */
 const held = reactive<Record<string, boolean>>({})
+/** XY pad position under this device's finger (null when not touching it here). */
+const xyLocal = ref<XY | null>(null)
 function applyBooth() {
   if (!audio) return
   const b = booth.value
@@ -554,8 +562,10 @@ function applyBooth() {
   audio.setPadVolume(b.padVolume)
   audio.setTalkover(!!held.talkover || b.talkover)
   audio.setEcho(!!held.echo || b.echo)
+  audio.setBrake(!!held.brake || b.brake)
+  audio.setXY(xyLocal.value ?? b.xy)
 }
-watch([booth, () => held.talkover, () => held.echo], applyBooth, { deep: true })
+watch([booth, () => held.talkover, () => held.echo, () => held.brake, xyLocal], applyBooth, { deep: true })
 
 async function fx(action: string, extra: Record<string, unknown> = {}) {
   fxError.value = ''
@@ -637,7 +647,7 @@ const eqLabel = (v: number) => (v <= -26 ? 'kill' : `${v > 0 ? '+' : ''}${v} dB`
 
 /** Hold buttons: "on" + keep-alive every 2 s while pressed (server releases after 6 s otherwise). */
 const holdTimers: Record<string, ReturnType<typeof setInterval>> = {}
-function holdStart(name: 'talkover' | 'echo', ev: PointerEvent) {
+function holdStart(name: 'talkover' | 'echo' | 'brake', ev: PointerEvent) {
   try {
     ;(ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId)
   } catch {
@@ -650,12 +660,148 @@ function holdStart(name: 'talkover' | 'echo', ev: PointerEvent) {
   holdTimers[name] = setInterval(() => fx(name, { on: true }), 2000)
   navigator.vibrate?.(10)
 }
-function holdEnd(name: 'talkover' | 'echo') {
+function holdEnd(name: 'talkover' | 'echo' | 'brake') {
   if (!held[name]) return
   held[name] = false
   if (name === 'talkover') void audio?.voice(false)
   clearInterval(holdTimers[name])
   fx(name, { on: false })
+}
+
+// XY pad: the finger position drives a DJ filter (x) and resonance + echo (y) on every
+// listening device. Applied here at once; sent at most every 60 ms, kept alive every 2 s.
+const xyShown = computed(() => xyLocal.value ?? booth.value.xy)
+let xySentAt = 0
+let xyTimer: ReturnType<typeof setTimeout> | undefined
+let xyKeep: ReturnType<typeof setInterval> | undefined
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+function xyAt(e: PointerEvent): XY {
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  return { x: clamp01((e.clientX - r.left) / r.width), y: clamp01(1 - (e.clientY - r.top) / r.height) }
+}
+function xySend() {
+  clearTimeout(xyTimer)
+  if (!xyLocal.value) return
+  const wait = 60 - (Date.now() - xySentAt)
+  if (wait > 0) {
+    xyTimer = setTimeout(xySend, wait)
+    return
+  }
+  xySentAt = Date.now()
+  fx('xy', { ...xyLocal.value, on: true })
+}
+function xyDown(e: PointerEvent) {
+  e.preventDefault()
+  try {
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  } catch {
+    /* synthetic event */
+  }
+  xyLocal.value = xyAt(e)
+  xySend()
+  clearInterval(xyKeep)
+  xyKeep = setInterval(() => xyLocal.value && fx('xy', { ...xyLocal.value, on: true }), 2000)
+  navigator.vibrate?.(10)
+}
+function xyMove(e: PointerEvent) {
+  if (!xyLocal.value) return
+  xyLocal.value = xyAt(e)
+  xySend()
+}
+function xyUp() {
+  if (!xyLocal.value) return
+  xyLocal.value = null
+  clearTimeout(xyTimer)
+  clearInterval(xyKeep)
+  booth.value.xy = null
+  fx('xy', { on: false })
+}
+
+// Record a pad: hold the tile, speak, let go (4 s max). It's trimmed on the server and
+// becomes a pad on every page.
+const recording = ref(false)
+let recWanted = false
+let recorder: MediaRecorder | null = null
+let recTimer: ReturnType<typeof setTimeout> | undefined
+async function recStart(e: PointerEvent) {
+  e.preventDefault()
+  try {
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  } catch {
+    /* synthetic event */
+  }
+  if (recording.value) return
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    return showFxError(window.isSecureContext ? 'This browser cannot record.' : 'Recording needs the https:// address.')
+  }
+  recWanted = true
+  let stream: MediaStream
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true } })
+  } catch (err: any) {
+    return showFxError(err?.name === 'NotAllowedError' ? 'Microphone access was refused.' : 'No microphone.')
+  }
+  if (!recWanted) {
+    // Let go while the browser was asking for the mic.
+    for (const t of stream.getTracks()) t.stop()
+    return showFxError('Microphone ready: hold the tile while you speak.')
+  }
+  const chunks: Blob[] = []
+  const rec = (recorder = new MediaRecorder(stream))
+  rec.ondataavailable = (ev) => ev.data.size && chunks.push(ev.data)
+  rec.onstop = () => {
+    for (const t of stream.getTracks()) t.stop()
+    void uploadPad(new Blob(chunks, { type: rec.mimeType }))
+  }
+  rec.start()
+  recording.value = true
+  navigator.vibrate?.(20)
+  recTimer = setTimeout(recEnd, 4000)
+}
+function recEnd() {
+  recWanted = false
+  clearTimeout(recTimer)
+  if (recorder?.state === 'recording') recorder.stop()
+  recorder = null
+  recording.value = false
+}
+async function uploadPad(blob: Blob) {
+  if (blob.size < 500) return showFxError('Too short: hold the tile while you speak.')
+  const label = prompt('Name your pad', `Pad ${pads.value.filter((p) => p.recorded).length + 1}`)
+  if (label === null) return
+  try {
+    await $fetch('/api/pads', { method: 'POST', query: { label }, body: blob, headers: { 'content-type': blob.type || 'application/octet-stream' } })
+    await reloadPads()
+  } catch (e: any) {
+    showFxError(e?.data?.statusMessage || 'Could not save the pad')
+  }
+}
+async function deletePad(p: Pad) {
+  if (!confirm(`Delete the pad "${p.label}"?`)) return
+  await $fetch(`/api/pads/${encodeURIComponent(p.id)}`, { method: 'DELETE' }).catch(() => showFxError('Could not delete the pad'))
+  await reloadPads()
+}
+async function reloadPads() {
+  pads.value = await $fetch<Pad[]>('/api/pads').catch(() => pads.value)
+  audio?.loadPads(pads.value)
+}
+function showFxError(msg: string) {
+  fxError.value = msg
+  setTimeout(() => (fxError.value = ''), 4000)
+}
+
+/** Talkover voice character, per device (only this device plays its voice). */
+const VOICES: { id: VoicePreset; label: string }[] = [
+  { id: 'tannoy', label: '📢 Tannoy' },
+  { id: 'robot', label: '🤖 Robot' },
+  { id: 'chipmunk', label: '🐿️ Chipmunk' },
+  { id: 'monster', label: '👹 Monster' },
+]
+const voicePreset = ref<VoicePreset>((safeStorage('voicePreset') as VoicePreset | null) || 'tannoy')
+function setVoicePreset(p: VoicePreset) {
+  voicePreset.value = p
+  audio?.setVoicePreset(p)
+  safeStorage('voicePreset', p)
 }
 
 /** Talkover also opens this device's mic into its own output (with the funfair reverb). */
@@ -758,8 +904,7 @@ async function start() {
   // Back from the lock screen: wake the audio up if the browser paused it anyway.
   document.addEventListener('visibilitychange', onVisible)
   connectBooth()
-  pads.value = await $fetch<Pad[]>('/api/pads').catch(() => [])
-  audio?.loadPads(pads.value)
+  await reloadPads()
   lanIp.value = (await $fetch<string[]>('/api/lan').catch(() => []))[0] ?? null
   const frame = () => {
     now.value = Date.now()
@@ -784,6 +929,8 @@ onBeforeUnmount(() => {
   clearTimeout(engTimer)
   cancelAnimationFrame(rafId)
   for (const t of Object.values(holdTimers)) clearInterval(t)
+  clearInterval(xyKeep)
+  recEnd()
 })
 </script>
 
@@ -1030,20 +1177,33 @@ onBeforeUnmount(() => {
           <p v-if="fxError" class="err">{{ fxError }}</p>
 
           <div class="pads">
+            <div v-for="p in pads" :key="p.id" class="pad-wrap">
+              <button
+                class="pad"
+                :class="{ live: booth.pads.includes(p.id) }"
+                :title="`${p.label} (${p.durationSec?.toFixed(1)} s)`"
+                @pointerdown="padDown($event, p)"
+                @pointermove="padMove"
+                @pointerup="padUp($event, p)"
+                @pointercancel="padTouches.delete($event.pointerId)"
+                @contextmenu.prevent
+              >
+                <span class="pad-emoji">{{ p.emoji }}</span>
+                <span class="pad-label">{{ p.label }}</span>
+              </button>
+              <button v-if="p.recorded" class="pad-del" :title="`Delete ${p.label}`" :aria-label="`Delete ${p.label}`" @click="deletePad(p)">✕</button>
+            </div>
             <button
-              v-for="p in pads"
-              :key="p.id"
-              class="pad"
-              :class="{ live: booth.pads.includes(p.id) }"
-              :title="`${p.label} (${p.durationSec?.toFixed(1)} s)`"
-              @pointerdown="padDown($event, p)"
-              @pointermove="padMove"
-              @pointerup="padUp($event, p)"
-              @pointercancel="padTouches.delete($event.pointerId)"
+              class="pad rec"
+              :class="{ live: recording }"
+              title="Hold and speak (4 s max): it becomes a pad"
+              @pointerdown="recStart"
+              @pointerup="recEnd"
+              @pointercancel="recEnd"
               @contextmenu.prevent
             >
-              <span class="pad-emoji">{{ p.emoji }}</span>
-              <span class="pad-label">{{ p.label }}</span>
+              <span class="pad-emoji">{{ recording ? '⏺️' : '🔴' }}</span>
+              <span class="pad-label">{{ recording ? 'Recording…' : 'Hold to record' }}</span>
             </button>
           </div>
           <label class="slider-row">
@@ -1077,12 +1237,42 @@ onBeforeUnmount(() => {
             <button class="hold" title="Echo the current track out and bring in the next one" :disabled="eng?.status !== 'playing'" @click="echoOut">
               🌀⏭ <span>Echo out</span><small>tap</small>
             </button>
+            <button
+              class="hold"
+              :class="{ on: held.brake || booth.brake }"
+              title="Hold: the music slows down to a stop like a turntable; let go to spin it back up"
+              @pointerdown.prevent="holdStart('brake', $event)"
+              @pointerup="holdEnd('brake')"
+              @pointercancel="holdEnd('brake')"
+              @contextmenu.prevent
+            >
+              🛑 <span>Brake</span><small>hold</small>
+            </button>
+          </div>
+
+          <div
+            class="xy"
+            :class="{ on: !!xyShown }"
+            title="Drag: left = low-pass, right = high-pass, up = resonance + echo. Let go to come back."
+            @pointerdown="xyDown"
+            @pointermove="xyMove"
+            @pointerup="xyUp"
+            @pointercancel="xyUp"
+            @contextmenu.prevent
+          >
+            <span class="xy-l">◀ low</span>
+            <span class="xy-r">high ▶</span>
+            <span class="xy-t">▲ resonance + echo</span>
+            <span v-if="xyShown" class="xy-dot" :style="{ left: `${xyShown.x * 100}%`, top: `${(1 - xyShown.y) * 100}%` }" />
           </div>
 
           <label class="slider-row">
             <span>Voice volume</span>
             <input type="range" min="0" max="2" step="0.05" :value="voiceVolume" @change="setVoiceVolume(Number(($event.target as HTMLInputElement).value))">
           </label>
+          <div class="seg voice-seg" role="group" aria-label="Voice">
+            <button v-for="v in VOICES" :key="v.id" :class="{ on: voicePreset === v.id }" @click="setVoicePreset(v.id)">{{ v.label }}</button>
+          </div>
 
           <h3>Colour</h3>
           <div class="seg">
