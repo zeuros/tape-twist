@@ -57,6 +57,8 @@ const ANCHOR_WINDOW = 120 // callbacks (~5 s) over which the earliest timing win
 export const nowMs = () => performance.timeOrigin + performance.now()
 
 /** Transparent below 0.9, soft-saturates above, never exceeds 1 (input pre-scaled by 0.5). */
+const dbToGain = (db: number) => Math.pow(10, db / 20)
+
 function limiterCurve() {
   const n = 4097
   const c = new Float32Array(n)
@@ -86,6 +88,7 @@ const rampValue = (r: Ramp, now = performance.now()) => {
 interface Graph {
   ctx: AudioContext
   bass: BiquadFilterNode[]
+  trim: GainNode[]
   gain: GainNode[]
   fifo: Float32Array[] // planar, one per capture channel
   w: number
@@ -96,6 +99,8 @@ interface Graph {
 class Mixer {
   private gains: Ramp[] = SINKS.map(() => ({ from: 0, to: 0, t0: 0, dur: 0 }))
   private bassDb = SINKS.map(() => 0)
+  /** Per-deck level trim (dB): evens out the platforms' loudness (Deezer plays quieter). */
+  private trimDb = SINKS.map(() => 0)
 
   private graph: Graph | null = null
   private capture: ChildProcess | null = null
@@ -182,6 +187,14 @@ class Mixer {
     if (this.graph) this.graph.bass[d]!.gain.setTargetAtTime(this.bassDb[d]!, this.graph.ctx.currentTime, 0.025)
   }
 
+  /** Per-deck level trim (dB), set from the platform the deck plays. */
+  deckTrim(deck: SinkName, db: number) {
+    const d = SINKS.indexOf(deck)
+    if (this.trimDb[d] === db) return
+    this.trimDb[d] = db
+    if (this.graph) this.graph.trim[d]!.gain.setTargetAtTime(dbToGain(db), this.graph.ctx.currentTime, 0.05)
+  }
+
   // ------------------------------------------------------------ pipeline
 
   private buildGraph(): Graph {
@@ -192,15 +205,18 @@ class Mixer {
     input.connect(split)
     const sum = new GainNode(ctx, { gain: 0.5 }) // limiter curve spans -2..2
     const bass: BiquadFilterNode[] = []
+    const trim: GainNode[] = []
     const gain: GainNode[] = []
     SINKS.forEach((_, d) => {
       const merge = new ChannelMergerNode(ctx, { numberOfInputs: 2 })
       split.connect(merge, 2 * d, 0)
       split.connect(merge, 2 * d + 1, 1)
       const b = new BiquadFilterNode(ctx, { type: 'lowshelf', frequency: 200, gain: this.bassDb[d]! })
+      const t = new GainNode(ctx, { gain: dbToGain(this.trimDb[d]!) })
       const g = new GainNode(ctx, { gain: rampValue(this.gains[d]!) })
-      merge.connect(b).connect(g).connect(sum)
+      merge.connect(b).connect(t).connect(g).connect(sum)
       bass.push(b)
+      trim.push(t)
       gain.push(g)
     })
     const limiter = new WaveShaperNode(ctx, { curve: limiterCurve() })
@@ -210,6 +226,7 @@ class Mixer {
     const g: Graph = {
       ctx,
       bass,
+      trim,
       gain,
       fifo: [0, 1, 2, 3].map(() => new Float32Array(RING)),
       w: 0,

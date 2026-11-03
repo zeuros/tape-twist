@@ -350,7 +350,7 @@ interface EngineState {
   durSec: number
   next: { id: string; title: string; artist: string } | null
   crossfade: number
-  settings: { crossfade: number; bassSwap: boolean; autoPauseHours: number; idlePauseMin: number }
+  settings: { crossfade: number; bassSwap: boolean; deezerBoostDb: number; autoPauseHours: number; idlePauseMin: number }
   listeners: number
   error: string
   notice: string
@@ -1397,6 +1397,10 @@ onBeforeUnmount(() => {
             <label class="check">
               <input type="checkbox" :checked="eng.settings.bassSwap" @change="setSetting('bassSwap', ($event.target as HTMLInputElement).checked)">
               Bass swap during crossfades
+            </label>
+            <label class="slider-row" title="Deezer tracks play quieter than SoundCloud ones: this evens them out">
+              <span>Deezer level: +{{ eng.settings.deezerBoostDb ?? 0 }} dB</span>
+              <input type="range" min="0" max="18" step="0.5" :value="eng.settings.deezerBoostDb ?? 0" @input="setSetting('deezerBoostDb', Number(($event.target as HTMLInputElement).value))">
             </label>
             <label class="slider-row">
               <span>Talkover / pad duck: −{{ booth.duckDb }} dB</span>

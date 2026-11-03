@@ -3,6 +3,9 @@ import { Deck, type DeckState } from './deck'
 import { EQ_MIN, mixer } from './mixer'
 import { activeList, loadEvening, readJson, writeJson, type FavItem } from './store'
 
+/** Deezer plays quieter than SoundCloud: measured on the same songs on both (see README). */
+const DEEZER_BOOST_DB = 11.5
+
 /** Time we allow for loading the next item before its fade must start. */
 const PRELOAD_LEAD = 25 // s before the crossfade; a fresh Deezer page takes a few seconds to open
 /** Hidden browsers are closed after this long without playback (frees RAM and the Deezer session). */
@@ -14,6 +17,8 @@ export interface EngineSettings {
   crossfade: number
   /** Cut the outgoing bass / bring in the incoming bass at the middle of a crossfade. */
   bassSwap: boolean
+  /** Level added to Deezer tracks so they match SoundCloud's (dB). */
+  deezerBoostDb: number
   /** Pause after this many hours of continuous playback (0 = never). */
   autoPauseHours: number
   /** Pause when nobody has been listening for this many minutes (0 = never). */
@@ -50,7 +55,7 @@ class Engine {
   /** Informational message, e.g. why playback was auto-paused. */
   notice = ''
   last: DeckState | null = null
-  settings: EngineSettings = { crossfade: 6, bassSwap: true, autoPauseHours: 6, idlePauseMin: 15 }
+  settings: EngineSettings = { crossfade: 6, bassSwap: true, deezerBoostDb: DEEZER_BOOST_DB, autoPauseHours: 6, idlePauseMin: 15 }
 
   private get cur() {
     return this.decks[this.active]
@@ -129,6 +134,16 @@ class Engine {
    * Make `item` the audible one. With something already playing, fade over `fade` s:
    * a true overlap across decks, or out-then-in when both are Deezer (one stream per account).
    */
+  /** Load an item on a deck, at its platform's level (Deezer plays quieter than SoundCloud). */
+  private load(deck: Deck, item: FavItem, autoplay: boolean) {
+    mixer.deckTrim(deck.sink, this.trimDb(item))
+    return deck.load(item, autoplay)
+  }
+
+  private trimDb(item: FavItem) {
+    return item.platform === 'deezer' ? this.settings.deezerBoostDb : 0
+  }
+
   private async switchTo(item: FavItem, fade: number) {
     this.error = ''
     const cur = this.cur
@@ -140,13 +155,13 @@ class Engine {
         await Promise.all(this.decks.map((d) => d.pause()))
         mixer.deckBass(cur.sink, 0)
         await cur.setVolume(1)
-        await cur.load(item, true)
+        await this.load(cur, item, true)
         await cur.play() // confirms playback (a fresh Deezer page may ignore autoplay)
         this.rerouteSoon()
         this.loading = null
       } else if (cur.item!.platform === 'deezer' && item.platform === 'deezer') {
         await mixer.ramp([{ sink: cur.sink, to: 0 }], fade / 2, () => this.abortFade)
-        await cur.load(item, true)
+        await this.load(cur, item, true)
         await cur.play()
         this.rerouteSoon()
         this.loading = null
@@ -156,7 +171,7 @@ class Engine {
         const next = this.other
         if (this.preloaded !== item.id) {
           await next.setVolume(0)
-          await next.load(item, false)
+          await this.load(next, item, false)
         }
         // Bass swap: the incoming track comes in without bass; halfway through, the basses
         // trade places, so two kick drums never pile up.
@@ -210,7 +225,7 @@ class Engine {
       if (!crossDz && this.preloaded !== next.id && s.durSec > 0 && remaining <= crossfade + PRELOAD_LEAD) {
         await this.run(async () => {
           await this.other.setVolume(0)
-          await this.other.load(next, false)
+          await this.load(this.other, next, false)
           this.preloaded = next.id
         }, false)
       }
@@ -330,9 +345,11 @@ class Engine {
     this.settings = {
       crossfade: clamp(s.crossfade, 0, 15, cur.crossfade),
       bassSwap: typeof s.bassSwap === 'boolean' ? s.bassSwap : cur.bassSwap,
+      deezerBoostDb: clamp(s.deezerBoostDb, 0, 18, cur.deezerBoostDb),
       autoPauseHours: clamp(s.autoPauseHours, 0, 24, cur.autoPauseHours),
       idlePauseMin: clamp(s.idlePauseMin, 0, 240, cur.idlePauseMin),
     }
+    for (const d of this.decks) if (d.item) mixer.deckTrim(d.sink, this.trimDb(d.item))
     await writeJson('engine.json', this.settings)
   }
 
