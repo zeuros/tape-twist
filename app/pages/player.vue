@@ -180,9 +180,18 @@ function newPlaylist() {
   doc.value.playlists.push({ id, title: `Playlist ${doc.value.playlists.length + 1}`, startTime: evening.value.startTime, items: [] })
   doc.value.open = id
 }
+// Two taps instead of confirm(): a dialog freezes the page and the live stream with it.
+const plDelArmed = ref<string | null>(null)
+let plDelTimer: ReturnType<typeof setTimeout> | undefined
 function deletePlaylist(p: Playlist) {
   if (doc.value.playlists.length < 2) return
-  if (p.items.length && !confirm(`Delete "${p.title}" and its ${p.items.length} songs?`)) return
+  clearTimeout(plDelTimer)
+  if (p.items.length && plDelArmed.value !== p.id) {
+    plDelArmed.value = p.id
+    plDelTimer = setTimeout(() => (plDelArmed.value = null), 3000)
+    return
+  }
+  plDelArmed.value = null
   const i = doc.value.playlists.indexOf(p)
   doc.value.playlists.splice(i, 1)
   doc.value.open = doc.value.playlists[Math.max(0, i - 1)].id
@@ -233,19 +242,11 @@ async function syncEvening(serverRev?: number) {
 
 // ---------------------------------------------------------------- ask Claude
 // One line at the top of the playlist: Claude finds songs, they're added to that playlist.
-type MixMethod = 'pick' | 'dig' | 'favs'
-const MIX_METHODS: { id: MixMethod; label: string; title: string }[] = [
-  { id: 'pick', label: '🧠 Pick', title: 'Claude names songs from what it knows; each is searched on SoundCloud and Deezer (fast, sometimes not found)' },
-  { id: 'dig', label: '⛏️ Dig', title: 'Claude writes searches, the server gathers real tracks (+ SoundCloud related of the reference), Claude picks from them' },
-  { id: 'favs', label: '♥ Favs', title: 'Claude picks among your liked tracks' },
-]
 const aiPrompt = ref('')
 const aiCount = ref(Number(safeStorage('aiCount')) || 10)
-const aiMethod = ref<MixMethod>((safeStorage('aiMethod') as MixMethod | null) || 'pick')
 const aiBusy = ref(false)
 const aiStatus = ref('')
 watch(aiCount, (v) => safeStorage('aiCount', String(v)))
-watch(aiMethod, (v) => safeStorage('aiMethod', v))
 async function askClaude() {
   const prompt = aiPrompt.value.trim()
   if (!prompt || aiBusy.value) return
@@ -253,12 +254,11 @@ async function askClaude() {
   aiBusy.value = true
   aiStatus.value = 'Claude is choosing…'
   try {
-    const r = await $fetch<{ items: FavItem[]; missing: string[]; note: string; ms: number }>('/api/ai/mix', {
+    const r = await $fetch<{ items: FavItem[]; note: string; ms: number }>('/api/ai/mix', {
       method: 'POST',
       body: {
         prompt,
         count: Math.max(1, Math.min(40, aiCount.value || 10)),
-        method: aiMethod.value,
         playlistTitle: target.title,
         current: target.items.map((i) => ({ artist: i.artist, title: i.title })),
       },
@@ -267,7 +267,7 @@ async function askClaude() {
     const have = new Set(pl.items.map((i) => i.id))
     const added = r.items.filter((f) => !have.has(f.id))
     pl.items.push(...added.map((f) => ({ ...f, mood: 'chill' })))
-    aiStatus.value = `+${added.length} in ${(r.ms / 1000).toFixed(0)} s${r.missing.length ? ` · not found: ${r.missing.join(', ')}` : ''}${r.note ? ` · ${r.note}` : ''}`
+    aiStatus.value = `+${added.length} in ${(r.ms / 1000).toFixed(0)} s${r.note ? ` · ${r.note}` : ''}`
   } catch (e: any) {
     aiStatus.value = e?.data?.statusMessage || e?.message || 'Claude failed'
   } finally {
@@ -809,19 +809,43 @@ function recEnd() {
   recorder = null
   recording.value = false
 }
-async function uploadPad(blob: Blob) {
+// Naming and deleting happen inline: a prompt()/confirm() dialog freezes the page, and with it
+// the live stream it feeds (the music stopped while the dialog was open).
+const recBlob = shallowRef<Blob | null>(null)
+const recName = ref('')
+const recNameEl = ref<HTMLInputElement | null>(null)
+const recSaving = ref(false)
+function uploadPad(blob: Blob) {
   if (blob.size < 500) return showFxError('Too short: hold the tile while you speak.')
-  const label = prompt('Name your pad', `Pad ${pads.value.filter((p) => p.recorded).length + 1}`)
-  if (label === null) return
+  recBlob.value = blob
+  recName.value = `Pad ${pads.value.filter((p) => p.recorded).length + 1}`
+  void nextTick(() => recNameEl.value?.select())
+}
+async function savePad() {
+  const blob = recBlob.value
+  if (!blob || recSaving.value) return
+  recSaving.value = true
   try {
-    await $fetch('/api/pads', { method: 'POST', query: { label }, body: blob, headers: { 'content-type': blob.type || 'application/octet-stream' } })
+    await $fetch('/api/pads', { method: 'POST', query: { label: recName.value }, body: blob, headers: { 'content-type': blob.type || 'application/octet-stream' } })
+    recBlob.value = null
     await reloadPads()
   } catch (e: any) {
     showFxError(e?.data?.statusMessage || 'Could not save the pad')
+  } finally {
+    recSaving.value = false
   }
 }
+const delArmed = ref<string | null>(null)
+let delTimer: ReturnType<typeof setTimeout> | undefined
 async function deletePad(p: Pad) {
-  if (!confirm(`Delete the pad "${p.label}"?`)) return
+  clearTimeout(delTimer)
+  if (delArmed.value !== p.id) {
+    // First tap arms it, a second tap within 3 s deletes.
+    delArmed.value = p.id
+    delTimer = setTimeout(() => (delArmed.value = null), 3000)
+    return
+  }
+  delArmed.value = null
   await $fetch(`/api/pads/${encodeURIComponent(p.id)}`, { method: 'DELETE' }).catch(() => showFxError('Could not delete the pad'))
   await reloadPads()
 }
@@ -1141,7 +1165,7 @@ onBeforeUnmount(() => {
         <div class="panel-head">
           <input v-model="evening.title" class="ev-title" aria-label="Playlist title">
           <small class="saved">{{ saved ? 'Saved' : 'Saving…' }}</small>
-          <button v-if="doc.playlists.length > 1" class="ghost sm" title="Delete this playlist" @click="deletePlaylist(evening)">🗑</button>
+          <button v-if="doc.playlists.length > 1" class="ghost sm" :class="{ danger: plDelArmed === evening.id }" :title="`Delete this playlist (${evening.items.length} songs)`" @click="deletePlaylist(evening)">{{ plDelArmed === evening.id ? `Delete ${evening.items.length} songs?` : '🗑' }}</button>
         </div>
         <form class="ai-row" @submit.prevent="askClaude">
           <input
@@ -1156,12 +1180,7 @@ onBeforeUnmount(() => {
           <input v-model.number="aiCount" class="ai-count" type="number" min="1" max="40" inputmode="numeric" aria-label="How many songs" title="How many songs">
           <button class="ai-go" type="submit" :disabled="aiBusy || !aiPrompt.trim()" :title="aiBusy ? 'Claude is choosing…' : 'Add songs'">{{ aiBusy ? '⏳' : '✨' }}</button>
         </form>
-        <div class="ai-meta">
-          <div class="ai-methods" role="group" aria-label="Method">
-            <button v-for="m in MIX_METHODS" :key="m.id" type="button" :class="{ on: aiMethod === m.id }" :title="m.title" @click="aiMethod = m.id">{{ m.label }}</button>
-          </div>
-          <small v-if="aiStatus" class="ai-status" :class="{ busy: aiBusy }">{{ aiStatus }}</small>
-        </div>
+        <small v-if="aiStatus" class="ai-status" :class="{ busy: aiBusy }">{{ aiStatus }}</small>
         <div class="ev-meta">
           <label>Starts <input v-model="evening.startTime" type="time"></label>
           <span>{{ dur(totalSec) }} · ends ~{{ endClock }}</span>
@@ -1254,9 +1273,17 @@ onBeforeUnmount(() => {
                 <span class="pad-emoji">{{ p.emoji }}</span>
                 <span class="pad-label">{{ p.label }}</span>
               </button>
-              <button v-if="p.recorded" class="pad-del" :title="`Delete ${p.label}`" :aria-label="`Delete ${p.label}`" @click="deletePad(p)">✕</button>
+              <button v-if="p.recorded" class="pad-del" :class="{ armed: delArmed === p.id }" :title="`Delete ${p.label}`" :aria-label="`Delete ${p.label}`" @click="deletePad(p)">{{ delArmed === p.id ? 'Delete?' : '✕' }}</button>
             </div>
+            <form v-if="recBlob" class="pad rec-name" @submit.prevent="savePad">
+              <input ref="recNameEl" v-model="recName" maxlength="30" aria-label="Pad name" enterkeyhint="done" :disabled="recSaving">
+              <span class="rec-actions">
+                <button type="button" class="ghost sm" title="Discard" :disabled="recSaving" @click="recBlob = null">✕</button>
+                <button type="submit" class="ghost sm" title="Save the pad" :disabled="recSaving">{{ recSaving ? '⏳' : '✓' }}</button>
+              </span>
+            </form>
             <button
+              v-else
               class="pad rec"
               :class="{ live: recording }"
               title="Hold and speak (4 s max): it becomes a pad"

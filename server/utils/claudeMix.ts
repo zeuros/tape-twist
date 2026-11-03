@@ -1,35 +1,27 @@
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { searchCatalogs, soundcloudRelated } from './platforms'
-import { favsFile, PLATFORMS, readJson, type FavCache, type FavItem } from './store'
+import type { FavItem } from './store'
 
 /**
  * "Ask Claude" for the evening: a one-line request ("calm bass music for ambience, go around
  * Kebuffeule (Iorie remix)") becomes real SoundCloud/Deezer tracks. Claude runs through the
  * Claude Code CLI on this machine (`claude -p`, the host's own login; no API key needed).
  *
- * Three methods, to compare:
- *  - pick:  Claude names songs from what it knows; each is looked up with the catalog search.
- *  - dig:   Claude turns the request into searches; the server gathers real results (plus
- *           SoundCloud's related tracks of the reference songs); Claude picks from that list.
- *  - favs:  Claude picks among the host's liked tracks.
+ * Two steps: Claude turns the request into catalog searches; the server gathers real results
+ * (plus SoundCloud's related tracks of the reference songs); Claude picks from that list.
  */
-export type MixMethod = 'pick' | 'dig' | 'favs'
-export const MIX_METHODS: MixMethod[] = ['pick', 'dig', 'favs']
 
 export interface MixRequest {
   prompt: string
   count: number
-  method: MixMethod
   /** What the playlist already holds (avoid repeats, follow its vibe). */
   current: { artist: string; title: string }[]
   playlistTitle?: string
 }
 export interface MixResult {
   items: FavItem[]
-  missing: string[]
   note: string
-  method: MixMethod
   ms: number
 }
 
@@ -99,23 +91,6 @@ function askClaude<T>(prompt: string, schema: object): Promise<T> {
 }
 
 const NOTE = { type: 'string' }
-const SONGS_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['songs', 'note'],
-  properties: {
-    note: NOTE,
-    songs: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['artist', 'title'],
-        properties: { artist: { type: 'string' }, title: { type: 'string' } },
-      },
-    },
-  },
-}
 const PICKS_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -139,34 +114,6 @@ const norm = (s: string) =>
     .replace(/\((official|lyric|audio|video|clip)[^)]*\)|\[(official|lyric|audio|video|clip)[^\]]*\]/g, ' ')
     .replace(/\b(feat|ft|featuring)\b\.?/g, ' ')
     .replace(/[^a-z0-9]+/g, ' ').trim()
-const tokens = (s: string) => new Set(norm(s).split(' ').filter((t) => t.length > 1 || /\d/.test(t)))
-const cover = (need: Set<string>, hay: Set<string>) => {
-  if (!need.size) return 1
-  let n = 0
-  for (const t of need) if (hay.has(t)) n++
-  return n / need.size
-}
-
-/** Find a suggested song in the catalogs: the title must be there, and the artist mostly. */
-async function resolve(s: { artist: string; title: string }): Promise<FavItem | null> {
-  const results = (await searchCatalogs(`${s.artist} ${s.title}`, 10).catch(() => [])).filter((i) => i.kind === 'track')
-  const title = tokens(s.title)
-  const artist = tokens(s.artist)
-  let best: FavItem | null = null
-  let bestScore = 0
-  for (const it of results) {
-    const hay = tokens(`${it.artist} ${it.title}`)
-    const t = cover(title, hay)
-    const a = cover(artist, hay)
-    if (t < 0.75 || a < 0.5) continue
-    // Extra words in the result's title (another remix, "live", "extended") cost a little.
-    const extra = [...tokens(it.title)].filter((w) => !title.has(w) && !artist.has(w)).length
-    const score = t * 2 + a - extra * 0.08
-    if (score > bestScore) [best, bestScore] = [it, score]
-  }
-  return best
-}
-
 async function mapLimit<T, R>(xs: T[], n: number, fn: (x: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(xs.length)
   let i = 0
@@ -183,24 +130,7 @@ const dur = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '
 const line = (i: number, f: FavItem) => `${i}|${f.artist} — ${f.title}|${dur(f.durationSec)}${f.genre ? `|${f.genre}` : ''}`
 const key = (a: string, t: string) => norm(`${a} ${t}`)
 
-// ---------------------------------------------------------------- methods
-
-async function pick(r: MixRequest) {
-  const ask = Math.ceil(r.count * 1.5) + 2 // some won't be found
-  const a = await askClaude<{ songs: { artist: string; title: string }[]; note: string }>(
-    `${PRE_PROMPT}\n\n${context(r)}\n\nSuggest ${ask} songs, in play order.`,
-    SONGS_SCHEMA,
-  )
-  const found = await mapLimit(a.songs, 4, resolve)
-  const items: FavItem[] = []
-  const missing: string[] = []
-  a.songs.forEach((s, i) => {
-    const f = found[i]
-    if (f && items.length < r.count && !items.some((x) => x.id === f.id)) items.push(f)
-    else if (!f) missing.push(`${s.artist} — ${s.title}`)
-  })
-  return { items, missing, note: a.note }
-}
+// ------------------------------------------------------------------- dig
 
 async function choose(r: MixRequest, pool: FavItem[], what: string) {
   if (!pool.length) throw new Error('Nothing to choose from (are the platforms connected?)')
@@ -213,7 +143,7 @@ async function choose(r: MixRequest, pool: FavItem[], what: string) {
     const f = pool[n]
     if (f && !items.includes(f) && items.length < r.count) items.push(f)
   }
-  return { items, missing: [], note: a.note }
+  return { items, note: a.note }
 }
 
 async function dig(r: MixRequest) {
@@ -245,19 +175,7 @@ async function dig(r: MixRequest) {
   return choose(r, pool.slice(0, 220), 'Here are real tracks found in the catalogs.')
 }
 
-async function favs(r: MixRequest) {
-  const lists = await Promise.all(PLATFORMS.map((p) => readJson<FavCache | null>(favsFile(p), null)))
-  const have = new Set(r.current.map((c) => key(c.artist, c.title)))
-  const pool = lists
-    .flatMap((l) => l?.items ?? [])
-    .filter((f) => f.kind === 'track' && !have.has(key(f.artist, f.title)))
-    .sort((a, b) => (b.addedAt ?? '').localeCompare(a.addedAt ?? ''))
-    .slice(0, 1500)
-  return choose(r, pool, "Here are the host's liked tracks (most recently liked first).")
-}
-
 export async function claudeMix(r: MixRequest): Promise<MixResult> {
   const t0 = Date.now()
-  const res = await (r.method === 'dig' ? dig(r) : r.method === 'favs' ? favs(r) : pick(r))
-  return { ...res, method: r.method, ms: Date.now() - t0 }
+  return { ...(await dig(r)), ms: Date.now() - t0 }
 }

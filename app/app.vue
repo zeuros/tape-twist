@@ -108,11 +108,7 @@ button:disabled { cursor: default; opacity: .45; }
 .ai-prompt:focus, .ai-count:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: -1px; }
 .ai-go { flex: none; width: 40px; height: 40px; border: 0; border-radius: 50%; padding: 0; font-size: 18px; background: var(--grad); box-shadow: var(--glow); }
 .ai-go:disabled { opacity: .5; box-shadow: none; }
-.ai-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 12px; }
-.ai-methods { display: flex; gap: 4px; }
-.ai-methods button { border: 0; border-radius: 999px; padding: 4px 10px; font-size: 12px; background: var(--panel-2); color: var(--muted); }
-.ai-methods button.on { background: color-mix(in srgb, var(--accent) 22%, var(--panel-2)); color: var(--text); }
-.ai-status { flex: 1 1 200px; min-width: 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
+.ai-status { display: block; margin: -2px 6px 12px; color: var(--muted); font-size: 12px; line-height: 1.35; }
 .ai-status.busy { color: var(--accent); }
 /* Playlists: horizontal tabs, dock-style: the open one is wide, the others squeeze to share the rest */
 .pl-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
@@ -193,6 +189,11 @@ button:disabled { cursor: default; opacity: .45; }
 .pad-wrap .pad { min-width: 0; }
 .pad-del { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; font-size: 11px; line-height: 1; color: var(--muted); background: rgba(0,0,0,.35); }
 .pad-del:hover { color: var(--text); background: rgba(0,0,0,.6); }
+.ghost.sm.danger { color: #fff; background: #c0392b; white-space: nowrap; }
+.pad-del.armed { width: auto; padding: 0 8px; border-radius: 999px; color: #fff; background: #c0392b; font-size: 11px; font-weight: 600; }
+.pad.rec-name { display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 8px; }
+.rec-name input { width: 100%; min-width: 0; border: 0; border-radius: 999px; padding: 6px 10px; font-size: 13px; text-align: center; background: #1c1d21; box-shadow: inset 0 2px 4px rgba(0,0,0,.35); }
+.rec-actions { display: flex; justify-content: center; gap: 6px; }
 .pad.rec { touch-action: none; -webkit-touch-callout: none; }
 .voice-seg { margin-top: 8px; }
 /* XY pad: a touch square, filter on x, resonance + echo on y */

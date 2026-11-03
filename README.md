@@ -79,11 +79,7 @@ The server mix (`server/utils/mixer.ts`) is just the music, as a Web Audio graph
 
 ## Ask Claude
 
-One line at the top of each playlist: a request ("calm bass music for ambience. go around Kebuffeule (Iorie remix)"), how many songs, ✨. The songs are appended to that playlist. Claude runs through the Claude Code CLI installed on the server machine (`claude -p`, its own login; no API key), one request at a time, Opus 5.5 at low effort (`CLAUDE_MIX_MODEL`, `CLAUDE_MIX_EFFORT`, `CLAUDE_BIN` to change). Three methods:
-
-- **🧠 Pick:** Claude names songs from what it knows; each one is looked up with the SoundCloud/Deezer search (title must match, artist mostly). Fast, but obscure references get generic picks.
-- **⛏️ Dig:** Claude writes searches; the server gathers real catalog results plus SoundCloud's "related tracks" of the reference songs, then Claude picks from that list. Best for "go around X".
-- **♥ Favs:** Claude picks among your liked tracks (most recent 1500).
+One line at the top of each playlist: a request ("calm bass music for ambience. go around Kebuffeule (Iorie remix)"), how many songs, ✨. The songs are appended to that playlist. Claude runs through the Claude Code CLI installed on the server machine (`claude -p`, its own login; no API key), one request at a time, Opus 5.5 at low effort (`CLAUDE_MIX_MODEL`, `CLAUDE_MIX_EFFORT`, `CLAUDE_BIN` to change). Claude first writes searches; the server gathers real SoundCloud/Deezer results plus SoundCloud's "related tracks" of the reference songs, then Claude picks and orders songs from that list. Its note on the direction it took shows under the line.
 
 ## Guest requests
 

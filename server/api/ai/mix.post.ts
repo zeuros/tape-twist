@@ -1,11 +1,10 @@
-import { claudeMix, MIX_METHODS, type MixMethod } from '../../utils/claudeMix'
+import { claudeMix } from '../../utils/claudeMix'
 
 // "Ask Claude" from the top of a playlist: a one-line request → real tracks to add.
 export default defineEventHandler(async (event) => {
   const b = await readBody<any>(event)
   const prompt = String(b?.prompt ?? '').trim().slice(0, 300)
   if (!prompt) throw createError({ statusCode: 400, statusMessage: 'Say what you want to hear' })
-  const method: MixMethod = MIX_METHODS.includes(b?.method) ? b.method : 'pick'
   const current = (Array.isArray(b?.current) ? b.current : []).slice(-200).map((c: any) => ({
     artist: String(c?.artist ?? '').slice(0, 100),
     title: String(c?.title ?? '').slice(0, 200),
@@ -13,7 +12,6 @@ export default defineEventHandler(async (event) => {
   try {
     return await claudeMix({
       prompt,
-      method,
       current,
       count: Math.max(1, Math.min(40, Math.round(Number(b?.count) || 10))),
       playlistTitle: typeof b?.playlistTitle === 'string' ? b.playlistTitle.slice(0, 100) : undefined,
