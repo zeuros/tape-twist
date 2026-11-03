@@ -1,4 +1,5 @@
-import { updateEvening, type Evening, type Playlist } from '../utils/store'
+import type { Evening, Playlist } from '#shared/types/music'
+import { updateEvening } from '../utils/store'
 
 const clean = (p: any, i: number): Playlist | null =>
   p && typeof p.title === 'string' && Array.isArray(p.items)
@@ -24,7 +25,7 @@ export default defineEventHandler(async (event) => {
       return cur
     }
     const pls = playlists as Playlist[]
-    return { playlists: pls, open: pls.some((p) => p.id === body.open) ? body.open : pls[0].id }
+    return { playlists: pls, open: pls.some((p) => p.id === body.open) ? body.open : pls[0]!.id }
   })
   if (conflict) throw createError({ statusCode: 409, statusMessage: 'changed elsewhere', data: saved })
   return saved

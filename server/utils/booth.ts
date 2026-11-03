@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
+import type { BoothEvent, BoothState, ColorPreset, Pad, XY } from '#shared/types/booth'
 import { DATA_DIR, readJson, writeJson } from './store'
 
 /**
@@ -20,52 +21,21 @@ const REC_MAX_SEC = 6 // 4 s of voice + the reverb tail
 const HOLD_TIMEOUT = 6000 // a held button must be refreshed within this (lost touch-up safety)
 const run = promisify(execFile)
 
-export type ColorPreset = 'off' | 'radio' | 'phone' | 'vinyl'
 export const COLORS: ColorPreset[] = ['off', 'radio', 'phone', 'vinyl']
 
-export interface Eq {
-  low: number
-  mid: number
-  high: number
-}
-
-export interface BoothState {
-  eq: Eq
-  color: ColorPreset
-  duckDb: number
-  padVolume: number
-  talkover: boolean
-  echo: boolean
-  brake: boolean
-  /** XY filter pad while a finger is on it, else null. */
-  xy: { x: number; y: number } | null
-  pads: string[] // playing now
-}
-
-export interface PadInfo {
-  id: string
-  emoji: string
-  label: string
+/** A pad and where its sound is (the file never leaves the server). */
+export interface PadInfo extends Pad {
   file: string
   durationSec: number
-  /** Recorded from the booth mic (can be deleted). */
-  recorded?: boolean
 }
 type PadEntry = Omit<PadInfo, 'durationSec'>
-
-export type BoothEvent =
-  | { type: 'state'; state: BoothState; from?: string }
-  | { type: 'pad'; id: string; on: boolean; from?: string }
-  | { type: 'stopPads'; from?: string }
-  | { type: 'echoOut'; from?: string }
-  | { type: 'padsChanged' }
 
 type Persisted = Pick<BoothState, 'eq' | 'color' | 'duckDb' | 'padVolume'>
 
 class Booth {
   private s: Persisted = { eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: 10, padVolume: 0.8 }
   private holds = { talkover: 0, echo: 0, brake: 0, xy: 0 }
-  private xy: { x: number; y: number } | null = null
+  private xy: XY | null = null
   private holdTimers: Record<string, ReturnType<typeof setTimeout>> = {}
   private playing = new Map<string, ReturnType<typeof setTimeout>>()
   private subs = new Set<(e: BoothEvent) => void>()
@@ -127,7 +97,7 @@ class Booth {
   }
 
   /** XY pad moved (or let go: null). Held like the buttons, so a lost touch-up can't stick. */
-  setXY(xy: { x: number; y: number } | null, from?: string) {
+  setXY(xy: XY | null, from?: string) {
     this.xy = xy
     this.holds.xy = xy ? Date.now() + HOLD_TIMEOUT : 0
     clearTimeout(this.holdTimers.xy)

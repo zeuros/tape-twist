@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { searchCatalogs, soundcloudRelated } from './platforms'
-import type { FavItem } from './store'
+import { searchCatalogs } from './platforms'
+import { soundcloudRelated } from './soundcloud'
+import type { FavItem } from '#shared/types/music'
 
 /**
  * "Ask Claude" for the evening: a one-line request ("calm bass music for ambience, go around

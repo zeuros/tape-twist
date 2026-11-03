@@ -7,6 +7,7 @@
     "build": "nuxt build",
     "start": "HOST=0.0.0.0 PORT=3000 node .output/server/index.mjs",
     "start:https": "NITRO_SSL_CERT=\"$(cat data/tls/cert.pem)\" NITRO_SSL_KEY=\"$(cat data/tls/key.pem)\" HOST=0.0.0.0 PORT=3000 node .output/server/index.mjs",
+    "typecheck": "nuxt typecheck",
     "postinstall": "nuxt prepare",
     "cert": "mkdir -p data/tls && openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj /CN=evening-mix -keyout data/tls/key.pem -out data/tls/cert.pem"
   },
@@ -20,5 +21,10 @@
   "allowScripts": {
     "esbuild@0.28.2": true
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^6.0.3",
+    "vue-tsc": "^3.3.14"
+  }
 }

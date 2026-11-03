@@ -1,6 +1,7 @@
-import { engine, type EngineSettings } from '../utils/engine'
+import type { EngineSettings } from '#shared/types/engine'
+import type { FavItem } from '#shared/types/music'
+import { engine } from '../utils/engine'
 import { hostStatus } from '../utils/status'
-import type { FavItem } from '../utils/store'
 
 interface Command {
   action: 'play' | 'pause' | 'resume' | 'next' | 'prev' | 'seek' | 'stop' | 'crossfade' | 'settings'

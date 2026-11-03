@@ -1,6 +1,7 @@
 import { captureState } from '../utils/capture'
 import { verify } from '../utils/platforms'
-import { favsFile, loadCreds, PLATFORMS, readJson, type FavCache, type Platform } from '../utils/store'
+import type { FavCache, Platform } from '#shared/types/music'
+import { favsFile, loadCreds, PLATFORMS, readJson } from '../utils/store'
 
 type Check = Awaited<ReturnType<typeof verify>> & { at: number }
 const checks: Partial<Record<Platform, Check>> = {}

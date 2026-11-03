@@ -2,6 +2,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-11-01',
   ssr: false,
   devtools: { enabled: false },
+  css: ['~/assets/css/base.css', '~/assets/css/player.css', '~/assets/css/booth.css', '~/assets/css/responsive.css', '~/assets/css/guest.css'],
   app: {
     head: {
       title: 'Evening Mix',

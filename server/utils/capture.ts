@@ -1,6 +1,7 @@
 import { mkdir } from 'node:fs/promises'
 import { chromium, type BrowserContext, type Request } from 'playwright'
-import { loadCreds, profileDir, saveCreds, type Credentials, type Platform } from './store'
+import type { Platform } from '#shared/types/music'
+import { loadCreds, profileDir, saveCreds, type Credentials } from './store'
 
 interface PlatformSpec {
   home: string

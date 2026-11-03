@@ -1,7 +1,9 @@
 import { enforceRouting, ensureSinks } from './audio'
 import { Deck, type DeckState } from './deck'
 import { EQ_MIN, mixer } from './mixer'
-import { activeList, loadEvening, readJson, writeJson, type FavItem } from './store'
+import type { EngineSettings, EngineSnapshot, EngineStatus } from '#shared/types/engine'
+import type { FavItem } from '#shared/types/music'
+import { activeList, loadEvening, readJson, writeJson } from './store'
 
 /** Deezer plays quieter than SoundCloud: measured on the same songs on both (see README). */
 const DEEZER_BOOST_DB = 11.5
@@ -10,20 +12,6 @@ const DEEZER_BOOST_DB = 11.5
 const PRELOAD_LEAD = 25 // s before the crossfade; a fresh Deezer page takes a few seconds to open
 /** Hidden browsers are closed after this long without playback (frees RAM and the Deezer session). */
 const CLOSE_DECKS_AFTER = 15 * 60_000
-
-type Status = 'stopped' | 'playing' | 'paused'
-
-export interface EngineSettings {
-  crossfade: number
-  /** Cut the outgoing bass / bring in the incoming bass at the middle of a crossfade. */
-  bassSwap: boolean
-  /** Level added to Deezer tracks so they match SoundCloud's (dB). */
-  deezerBoostDb: number
-  /** Pause after this many hours of continuous playback (0 = never). */
-  autoPauseHours: number
-  /** Pause when nobody has been listening for this many minutes (0 = never). */
-  idlePauseMin: number
-}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -45,7 +33,7 @@ class Engine {
   private idleSince = Date.now()
   private lastListenerAt = Date.now()
 
-  status: Status = 'stopped'
+  status: EngineStatus = 'stopped'
   currentId: string | null = null
   adhoc = false
   fading = false
@@ -58,13 +46,13 @@ class Engine {
   settings: EngineSettings = { crossfade: 6, bassSwap: true, deezerBoostDb: DEEZER_BOOST_DB, autoPauseHours: 6, idlePauseMin: 15 }
 
   private get cur() {
-    return this.decks[this.active]
+    return this.decks[this.active]!
   }
   private get other() {
-    return this.decks[1 - this.active]
+    return this.decks[1 - this.active]!
   }
 
-  private setStatus(s: Status) {
+  private setStatus(s: EngineStatus) {
     if (s === 'playing' && this.status !== 'playing') {
       this.playingSince = Date.now()
       this.lastListenerAt = Date.now()
@@ -353,7 +341,7 @@ class Engine {
     await writeJson('engine.json', this.settings)
   }
 
-  async snapshot() {
+  async snapshot(): Promise<EngineSnapshot> {
     await this.init()
     const cur = this.cur.item
     const next = await this.neighbour(1).catch(() => null)

@@ -1,0 +1,36 @@
+/* The guest page (/): now playing, up next, request and vote. */
+
+.guest { max-width: 640px; margin: 0 auto; padding: 16px 16px 40px; }
+.g-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.now-card { display: flex; gap: 14px; align-items: center; background: var(--grad); color: var(--on-accent); border: 0; border-radius: 24px; padding: 16px; box-shadow: var(--glow), var(--shadow); }
+.now-card .now-meta small, .now-card .now-meta span, .now-card.idle p { color: color-mix(in srgb, var(--on-accent) 70%, transparent); }
+.now-card .g-progress { background: rgba(0,0,0,.18); }
+.now-card .g-progress span { background: var(--on-accent); }
+.now-card img { width: 84px; height: 84px; border-radius: 16px; box-shadow: 0 8px 18px rgba(0,0,0,.3); object-fit: cover; flex: none; }
+.now-card.idle p { margin: 0; color: var(--muted); }
+.now-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.now-meta small { color: var(--accent); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.now-meta strong { font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.now-meta span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-progress { height: 4px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.g-progress span { display: block; height: 100%; background: var(--accent); transition: width 1s linear; }
+.g-section { margin-top: 22px; }
+.g-section h2 { font-size: 15px; margin: 0 0 10px; }
+.g-section h2 small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+.g-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.g-form input { background: var(--well); border: 0; box-shadow: var(--well-shadow); border-radius: 999px; padding: 12px 16px; min-width: 0; }
+.g-form input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: -1px; }
+.g-name { font-size: 14px; }
+.g-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.g-list li { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 18px; background: var(--panel); border: 0; box-shadow: var(--shadow); }
+.g-list li.approved { opacity: .65; }
+.g-list img { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; flex: none; }
+.g-meta { flex: 1; min-width: 0; }
+.g-btn { border: 0; color: var(--on-accent); background: var(--grad); box-shadow: var(--glow); border-radius: 999px; padding: 7px 12px; font-size: 13px; font-weight: 600; flex: none; white-space: nowrap; }
+.g-btn.done { background: var(--panel-2); box-shadow: none; color: var(--text); }
+.g-vote { border: 0; background: var(--panel-2); border-radius: 999px; padding: 7px 12px; font-size: 14px; flex: none; }
+.g-vote.on { background: var(--grad); color: var(--on-accent); }
+.g-vote.static { border: 0; background: none; color: var(--muted); }
+.g-fav { color: var(--accent); }
+.g-empty { color: var(--muted); justify-content: center; padding: 18px !important; background: none !important; }
+.g-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--grad); color: var(--on-accent); font-weight: 600; border: 0; padding: 10px 16px; border-radius: 999px; box-shadow: 0 8px 30px rgba(0,0,0,.4); white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }

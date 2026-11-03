@@ -1,0 +1,33 @@
+/* Layouts: three columns on wide screens, two on laptops, tabs on phones. */
+
+@media (min-width: 1200px) {
+  .shell { max-width: 1600px; }
+  .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(320px, 400px); }
+  .remote-row { max-width: 1600px; }
+}
+@media (min-width: 861px) and (max-width: 1199px) {
+  .side { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+}
+
+@media (max-width: 860px) {
+  .shell { padding-bottom: 200px; }
+  .tabs { display: flex; }
+  .tabs button { padding: 9px 4px; font-size: 14px; }
+  .cols { grid-template-columns: minmax(0, 1fr); }
+  .panel { border-radius: 20px; padding: 14px; }
+  .panel.hidden, .side.hidden { display: none; }
+  .conns { width: 100%; flex-wrap: nowrap; }
+  .conn { flex: 1; gap: 8px; padding-left: 10px; }
+  .conn button { white-space: nowrap; }
+  .conn-text small { max-width: 100%; }
+  .ops { flex-direction: column; }
+  .time { width: 34px; }
+  .remote { left: 6px; right: 6px; bottom: 6px; border-radius: 20px; }
+  .remote-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; padding: 8px 12px; }
+  .extras { grid-column: 1 / -1; justify-content: space-between; }
+  /* Sync slider: its own full-width row, so it can be set to a few ms. */
+  .xfade.ahead { flex: 1 1 100%; }
+  .xfade.ahead span { min-width: 6.5em; font-variant-numeric: tabular-nums; white-space: normal; }
+  .xfade.ahead small { display: block; }
+  .xfade.ahead input { flex: 1; width: auto; min-width: 0; height: 28px; }
+}

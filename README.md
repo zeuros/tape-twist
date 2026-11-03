@@ -86,6 +86,28 @@ One line at the top of each playlist: a request ("calm bass music for ambience. 
 
 Guests get a cookie ID, with no account needed. Asking for a track that's already requested counts as a vote. Each guest can have at most 5 pending requests. Approving a request inserts it right after the current track, behind earlier approved requests. The evening list has a revision number, so two open players (or a player plus approvals) never silently overwrite each other.
 
+## Project layout
+
+```
+shared/types/        types used by both sides (songs and playlists, booth, engine and requests)
+app/
+  pages/             index.vue (guests), player.vue (host): they only put the components together
+  components/        PlatformBadge, track/ (TrackArt, TrackRow), player/ (header, search, requests,
+                     player bar), evening/ (playlists, Ask Claude, the list), booth/ (pads, holds, XY, EQ…)
+  composables/       state and logic, one concern each: usePlatforms, useEvening, useEngine,
+                     useListening, useBooth, useVoice, useRequests (shared by the whole page),
+                     useFavoriteSearch, usePadRecorder, useConfirmTap (per component)
+  utils/             framework-free code: liveAudio / livePcm / serverClock (synced playback),
+                     boothAudio + booth/ (dsp, voice) (Web Audio effects), format, prefs
+  assets/css/        base, player, booth, responsive, guest
+server/
+  api/               thin routes: read the input, call server/utils
+  utils/             engine, deck, mixer, booth, requests, store; platforms (+ platformAuth,
+                     soundcloud, deezer), claudeMix
+```
+
+`npm run typecheck` checks the whole project (vue-tsc).
+
 ## Notes
 
 - Deezer may substitute a newer ID for an older favorite (same song). The deck accepts the match by ID or by title.

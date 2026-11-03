@@ -203,6 +203,7 @@ class Mixer {
   private buildGraph(): Graph {
     // sinkId 'none': render on our own clock, no sound card (the output goes to ffmpeg).
     const ctx = new AudioContext({ sinkId: { type: 'none' }, sampleRate: SR } as unknown as AudioContextOptions)
+    // @ts-expect-error node-web-audio-api's ScriptProcessorNode takes options (the DOM typings say it can't be constructed)
     const input = new ScriptProcessorNode(ctx, { bufferSize: BUF, numberOfInputChannels: 1, numberOfOutputChannels: 4 })
     const split = new ChannelSplitterNode(ctx, { numberOfOutputs: 4 })
     input.connect(split)
@@ -223,6 +224,7 @@ class Mixer {
       gain.push(g)
     })
     const limiter = new WaveShaperNode(ctx, { curve: limiterCurve() })
+    // @ts-expect-error see above
     const output = new ScriptProcessorNode(ctx, { bufferSize: BUF, numberOfInputChannels: 2, numberOfOutputChannels: 1 })
     sum.connect(limiter).connect(output).connect(ctx.destination) // silent; keeps it pulled
 

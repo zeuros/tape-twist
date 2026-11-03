@@ -1,7 +1,8 @@
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright'
 import { deckTag, type SinkName } from './audio'
 import { mixer } from './mixer'
-import { loadCreds, type FavItem, type Platform } from './store'
+import type { FavItem, Platform } from '#shared/types/music'
+import { loadCreds } from './store'
 
 export interface DeckState {
   posSec: number
@@ -229,7 +230,7 @@ export class Deck {
    * Compare the real audio length with the track's listed length; on a mismatch,
    * reload the page and load the track again, once.
    */
-  private async checkDeezerAudio(retry = true) {
+  private async checkDeezerAudio(retry = true): Promise<void> {
     const pg = this.pages.deezer
     const item = this.item
     if (!pg || !item) return

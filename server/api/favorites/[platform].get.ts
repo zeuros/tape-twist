@@ -1,5 +1,7 @@
-import { fetchFavorites, NeedsLogin } from '../../utils/platforms'
-import { favsFile, isPlatform, readJson, writeJson, type FavCache } from '../../utils/store'
+import { NeedsLogin } from '../../utils/platformAuth'
+import { fetchFavorites } from '../../utils/platforms'
+import type { FavCache } from '#shared/types/music'
+import { favsFile, isPlatform, readJson, writeJson } from '../../utils/store'
 
 export default defineEventHandler(async (event) => {
   const p = getRouterParam(event, 'platform')

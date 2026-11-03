@@ -1,4 +1,5 @@
-import { booth, COLORS, type ColorPreset } from '../utils/booth'
+import type { ColorPreset } from '#shared/types/booth'
+import { booth, COLORS } from '../utils/booth'
 import { engine } from '../utils/engine'
 import { mixer } from '../utils/mixer'
 

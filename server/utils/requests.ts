@@ -1,7 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { engine } from './engine'
-import { deezerTrack, searchCatalogs, soundcloudTrack } from './platforms'
-import { activeList, favsFile, PLATFORMS, readJson, updateEvening, writeJson, type FavCache, type FavItem } from './store'
+import { deezerTrack } from './deezer'
+import { searchCatalogs } from './platforms'
+import { soundcloudTrack } from './soundcloud'
+import type { GuestSearchItem, RequestStatus } from '#shared/types/engine'
+import type { FavCache, FavItem, PublicItem } from '#shared/types/music'
+import { activeList, favsFile, PLATFORMS, readJson, updateEvening, writeJson } from './store'
 
 export interface GuestRequest {
   id: string
@@ -9,7 +13,7 @@ export interface GuestRequest {
   guestId: string
   guestName: string
   votes: string[] // guest ids, requester included
-  status: 'pending' | 'approved' | 'rejected'
+  status: RequestStatus
   createdAt: string
   decidedAt?: string
 }
@@ -59,7 +63,7 @@ export async function searchFavorites(q: string, limit = 40) {
   const catalog = terms.length ? (await searchCatalogs(q)).filter((f) => f.kind === 'track') : [] // sets can't be requested
   const favIds = new Set(all.map((f) => f.id))
   const seen = new Set<string>()
-  const out: ReturnType<typeof publicItem>[] = []
+  const out: GuestSearchItem[] = []
   for (const f of [...hits.slice(0, limit), ...catalog]) {
     const key = dedupeKey(f)
     if (seen.has(key)) continue
@@ -69,7 +73,7 @@ export async function searchFavorites(q: string, limit = 40) {
   return out
 }
 
-export const publicItem = (f: FavItem) => ({
+export const publicItem = (f: FavItem): PublicItem => ({
   id: f.id,
   title: f.title,
   artist: f.artist,
