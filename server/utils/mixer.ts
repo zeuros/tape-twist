@@ -40,6 +40,7 @@ export const EQ_MIN = -26
 const BUF = 2048 // frames per script-processor callback (43 ms): tolerates main-thread hiccups
 const RING = 65536 // frames per input channel ring (1.37 s, power of 2)
 const PREFILL = BUF + 2400 // frames queued before the input starts (jitter cover)
+const STALL_MS = 2000 // no render callback for this long while capturing: the graph is stuck
 const MAX_QUEUE = BUF + 14400 // past this, skip ahead to PREFILL (clock drift, stalls)
 
 /** How far behind the server every synced phone plays (covers Wi-Fi hiccups). */
@@ -94,6 +95,8 @@ interface Graph {
   w: number
   r: number
   primed: boolean
+  /** Last render callback (performance.now()), for the stall watchdog. */
+  lastRender: number
 }
 
 class Mixer {
@@ -232,9 +235,16 @@ class Mixer {
       w: 0,
       r: 0,
       primed: false,
+      lastRender: performance.now(),
     }
-    input.onaudioprocess = (e: any) => this.pull(g, e.outputBuffer)
-    output.onaudioprocess = (e: any) => this.push(e.inputBuffer)
+    input.onaudioprocess = (e: any) => {
+      if (this.graph === g) this.pull(g, e.outputBuffer)
+    }
+    output.onaudioprocess = (e: any) => {
+      if (this.graph !== g) return // an abandoned graph that woke up again
+      g.lastRender = performance.now()
+      this.push(e.inputBuffer)
+    }
     this.graph = g
     this.gains.forEach((r, d) => this.scheduleRamp(d, r)) // a crossfade may be under way
     return g
@@ -278,20 +288,39 @@ class Mixer {
       p.on('exit', () => this.onExit())
     }
     encoder.stdin!.on('error', () => {})
+    this.watchdog = setInterval(() => this.checkStall(), 1000)
   }
 
-  private teardown() {
+  private watchdog: ReturnType<typeof setInterval> | undefined
+
+  /**
+   * The native render thread can deadlock (seen after ~30 min: blocked on a futex, no more
+   * callbacks) while capture and everything else keep running: the phones then hang on
+   * "Connecting". If no audio comes out for 2 s while the decks are being captured,
+   * rebuild the pipeline; the phones reconnect by themselves.
+   */
+  private checkStall() {
+    const g = this.graph
+    if (!g || performance.now() - g.lastRender < STALL_MS) return
+    if (g.w - g.r < BUF) return // nothing captured either: not the graph's fault
+    console.error(`[mixer] audio graph stalled for ${Math.round(performance.now() - g.lastRender)} ms: restarting the mix`)
+    this.onExit(true)
+  }
+
+  /** `abandon`: the graph's render thread is stuck; don't wait on it (close() could block too). */
+  private teardown(abandon = false) {
+    clearInterval(this.watchdog)
     this.capture?.kill('SIGTERM')
     this.encoder?.kill('SIGTERM')
     this.capture = this.encoder = null
     const g = this.graph
     this.graph = null
-    g?.ctx.close().catch(() => {})
+    if (g && !abandon) g.ctx.close().catch(() => {})
   }
 
-  private onExit() {
+  private onExit(abandon = false) {
     if (!this.capture && !this.graph) return
-    this.teardown()
+    this.teardown(abandon)
     // Unexpected exit: the timeline restarts, so close the streams; the phones reconnect
     // (after 2 s), which starts everything again with a new epoch.
     for (const l of this.listeners.keys()) l.destroy()
