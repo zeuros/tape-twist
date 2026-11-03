@@ -4,17 +4,21 @@ Browse your SoundCloud and Deezer favorites in one searchable list, arrange an e
 
 Requires Linux with PipeWire or PulseAudio (`pactl`) and `ffmpeg` with libmp3lame.
 
-- **Guests:** `http://<this-machine-ip>:3000/`. They can search your favorites and the whole SoundCloud and Deezer catalogs, request tracks and vote.
-- **Player:** `http://<this-machine-ip>:3000/player`. Open to anyone on the LAN, no PIN (it's meant for friends).
+- **Guests:** `https://<this-machine-ip>:3000/`. They can search your favorites and the whole SoundCloud and Deezer catalogs, request tracks and vote.
+- **Player:** `https://<this-machine-ip>:3000/player`. Open to anyone on the LAN, no PIN (it's meant for friends).
 
 ```sh
+# once
 npm install
-npm run dev            # http://<this-machine-ip>:3000, reachable on the LAN
+npx playwright install chromium   # the hidden player decks
+npm run cert                      # self-signed certificate in data/tls/
+
+npm run dev:https                 # https://<this-machine-ip>:3000, reachable on the LAN
 # or
-npm run build && npm start
+npm run build && npm run start:https
 ```
 
-**HTTPS (needed for the Talkover mic on phones).** Browsers only give the microphone to `https://` pages (or `localhost`). Create a self-signed certificate once with `npm run cert` (it goes to `data/tls/`), then use `npm run dev:https` or `npm run start:https` and open `https://<this-machine-ip>:3000`. Each phone shows a certificate warning once: accept it.
+The app is served over HTTPS because browsers only give the microphone (Talkover) to `https://` pages. Each phone shows a certificate warning once: accept it.
 
 ## How credentials work
 
@@ -49,7 +53,7 @@ npm run build && npm start
   - Pads, echo and your voice aren't delayed: they play at once on each device, on top of the synced music.
 - PipeWire remembers one output per app name, and both decks are "Chromium". Each deck therefore tags its audio with `PULSE_PROP evening.deck=a|b`, and the engine moves any stream that lands on the wrong sink back where it belongs.
 - `GET /api/engine-debug` shows each deck's raw player state.
-- Run `npm start` from the project folder: pads are loaded from `./pads` (or `PADS_DIR`).
+- Run `npm run start:https` from the project folder: pads are loaded from `./pads` (or `PADS_DIR`).
 
 ## Booth (effects)
 
