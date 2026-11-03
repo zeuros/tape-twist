@@ -44,6 +44,8 @@ class Engine {
   currentId: string | null = null
   adhoc = false
   fading = false
+  /** The item being loaded on a deck, until it actually starts playing (a fresh deck takes seconds). */
+  loading: FavItem | null = null
   error = ''
   /** Informational message, e.g. why playback was auto-paused. */
   notice = ''
@@ -132,6 +134,7 @@ class Engine {
     const cur = this.cur
     const audible = this.status === 'playing' && cur.item
     this.fading = true
+    this.loading = item
     try {
       if (!audible) {
         await Promise.all(this.decks.map((d) => d.pause()))
@@ -140,11 +143,13 @@ class Engine {
         await cur.load(item, true)
         await cur.play() // confirms playback (a fresh Deezer page may ignore autoplay)
         this.rerouteSoon()
+        this.loading = null
       } else if (cur.item!.platform === 'deezer' && item.platform === 'deezer') {
         await mixer.ramp([{ sink: cur.sink, to: 0 }], fade / 2, () => this.abortFade)
         await cur.load(item, true)
         await cur.play()
         this.rerouteSoon()
+        this.loading = null
         await mixer.ramp([{ sink: cur.sink, to: 1 }], fade / 2, () => this.abortFade)
         await cur.setVolume(1)
       } else {
@@ -165,6 +170,7 @@ class Engine {
           : undefined
         await next.play()
         this.rerouteSoon()
+        this.loading = null
         await mixer.ramp([{ sink: cur.sink, to: 0 }, { sink: next.sink, to: 1 }], fade, () => this.abortFade)
         clearTimeout(swapTimer)
         mixer.deckBass(next.sink, 0)
@@ -179,6 +185,7 @@ class Engine {
     } finally {
       this.preloaded = null
       this.fading = false
+      this.loading = null
     }
   }
 
@@ -336,6 +343,7 @@ class Engine {
     return {
       status: this.status,
       fading: this.fading,
+      loading: this.loading ? { id: this.loading.id, title: this.loading.title, artist: this.loading.artist, artwork: this.loading.artwork } : null,
       current: cur && this.status !== 'stopped' ? cur : null,
       currentId: this.status !== 'stopped' ? this.currentId : null,
       adhoc: this.adhoc,

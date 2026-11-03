@@ -86,7 +86,14 @@ button:disabled { cursor: default; opacity: .45; }
 .art { position: relative; width: 44px; height: 44px; flex: none; border: 0; border-radius: 6px; padding: 0; overflow: hidden; background: var(--panel-2); }
 .art img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .art .play { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.45); opacity: 0; transition: opacity .15s; font-size: 14px; }
-.art:hover .play, .art:focus-visible .play { opacity: 1; }
+.art:hover .play, .art:focus-visible .play, .art.loading .play { opacity: 1; }
+.spin { display: inline-block; width: 1em; height: 1em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; vertical-align: -0.15em; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.item.loading { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+.loading-note { color: var(--accent); }
+.now-art-wrap { position: relative; flex: none; width: 44px; height: 44px; border-radius: 10px; background: var(--panel-2); display: grid; place-items: center; }
+.now-art-wrap .spin { position: absolute; font-size: 18px; color: #fff; filter: drop-shadow(0 0 3px rgba(0,0,0,.6)); }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2s; } }
 .meta { flex: 1; min-width: 0; }
 .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sub { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

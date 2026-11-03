@@ -342,6 +342,7 @@ const endClock = computed(() => {
 interface EngineState {
   status: 'stopped' | 'playing' | 'paused'
   fading: boolean
+  loading: { id: string; title: string; artist: string; artwork?: string } | null
   current: FavItem | null
   currentId: string | null
   adhoc: boolean
@@ -392,8 +393,17 @@ async function command(action: string, extra: Record<string, unknown> = {}) {
   }
 }
 
-function playNow(item: FavItem) {
-  command('play', { id: item.id, item })
+// What's about to play: shown with a spinner from the click until the deck really plays
+// (opening a deck and loading the track can take several seconds).
+const clicked = ref<EngineState['loading']>(null)
+const loadingItem = computed(() => eng.value?.loading ?? clicked.value)
+async function playNow(item: FavItem) {
+  clicked.value = { id: item.id, title: item.title, artist: item.artist, artwork: item.artwork }
+  try {
+    await command('play', { id: item.id, item })
+  } finally {
+    clicked.value = null
+  }
 }
 function togglePlay() {
   if (!eng.value || eng.value.status === 'stopped') {
@@ -1095,9 +1105,9 @@ onBeforeUnmount(() => {
 
         <ul class="list">
           <li v-for="f in filtered.slice(0, shown)" :key="f.id" class="item">
-            <button class="art" :title="`Play ${f.title} now`" @click="playNow(f)">
+            <button class="art" :class="{ loading: loadingItem?.id === f.id }" :title="`Play ${f.title} now`" @click="playNow(f)">
               <img v-if="f.artwork" :src="f.artwork" alt="" loading="lazy">
-              <span class="play">▶</span>
+              <span class="play"><i v-if="loadingItem?.id === f.id" class="spin" /><template v-else>▶</template></span>
             </button>
             <div class="meta">
               <div class="title">{{ f.title }}</div>
@@ -1126,9 +1136,9 @@ onBeforeUnmount(() => {
           </h3>
           <ul class="list">
           <li v-for="f in catalogShown" :key="f.id" class="item">
-            <button class="art" :title="`Play ${f.title} now`" @click="playNow(f)">
+            <button class="art" :class="{ loading: loadingItem?.id === f.id }" :title="`Play ${f.title} now`" @click="playNow(f)">
               <img v-if="f.artwork" :src="f.artwork" alt="" loading="lazy">
-              <span class="play">▶</span>
+              <span class="play"><i v-if="loadingItem?.id === f.id" class="spin" /><template v-else>▶</template></span>
             </button>
             <div class="meta">
               <div class="title">{{ f.title }}</div>
@@ -1206,7 +1216,7 @@ onBeforeUnmount(() => {
             v-for="(it, i) in evening.items"
             :key="it.id"
             class="item ev"
-            :class="{ dragging: dragFrom === i, current: eng?.currentId === it.id }"
+            :class="{ dragging: dragFrom === i, current: eng?.currentId === it.id, loading: loadingItem?.id === it.id }"
             draggable="true"
             @dragstart="dragFrom = i"
             @dragover.prevent
@@ -1222,9 +1232,9 @@ onBeforeUnmount(() => {
               @pointercancel="handleUp"
             >⠿</span>
             <span class="time">{{ clock(schedule[i]) }}</span>
-            <button class="art" :title="`Play from ${it.title}`" @click="playNow(it)">
+            <button class="art" :class="{ loading: loadingItem?.id === it.id }" :title="`Play from ${it.title}`" @click="playNow(it)">
               <img v-if="it.artwork" :src="it.artwork" alt="" loading="lazy">
-              <span class="play">▶</span>
+              <span class="play"><i v-if="loadingItem?.id === it.id" class="spin" /><template v-else>▶</template></span>
             </button>
             <div class="meta">
               <div class="title">{{ it.title }}</div>
@@ -1471,9 +1481,17 @@ onBeforeUnmount(() => {
               </div>
               <div class="sub">
                 {{ eng.current.artist }} · {{ dur(Math.floor(shownPos)) }} / {{ dur(Math.round(eng.durSec)) }}
-                <span v-if="eng.fading" class="fading">crossfading…</span>
+                <span v-if="loadingItem && loadingItem.id !== eng.currentId" class="loading-note"> · <i class="spin" /> loading {{ loadingItem.title }}…</span>
+                <span v-else-if="eng.fading" class="fading">crossfading…</span>
                 <span v-else-if="eng.next"> · next: {{ eng.next.title }}</span>
               </div>
+            </div>
+          </template>
+          <template v-else-if="loadingItem">
+            <span class="now-art-wrap"><img v-if="loadingItem.artwork" :src="loadingItem.artwork" alt=""><i class="spin" /></span>
+            <div class="now-text">
+              <div class="title">{{ loadingItem.title }}</div>
+              <div class="sub loading-note">{{ loadingItem.artist }} · starting…</div>
             </div>
           </template>
           <div v-else class="sub idle">
@@ -1484,7 +1502,7 @@ onBeforeUnmount(() => {
         <div class="transport">
           <button class="ghost round" title="Previous" :disabled="busy || !eng?.current" @click="command('prev')">⏮</button>
           <button class="primary round" :title="eng?.status === 'playing' ? 'Pause' : 'Play'" :disabled="busy && eng?.status !== 'playing'" @click="togglePlay">
-            {{ eng?.status === 'playing' ? '❚❚' : '▶' }}
+            <i v-if="loadingItem && eng?.status !== 'playing'" class="spin" /><template v-else>{{ eng?.status === 'playing' ? '❚❚' : '▶' }}</template>
           </button>
           <button class="ghost round" title="Next" :disabled="busy || !eng?.next" @click="command('next')">⏭</button>
         </div>
