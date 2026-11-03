@@ -21,11 +21,6 @@
   --dz: #a238ff;
   --ok: #6fcf97;
   --bad: #ef6f6c;
-  --m-chill: #6cb4c9;
-  --m-feels: #e88aa8;
-  --m-groove: #ffb547;
-  --m-deep: #7f6ad6;
-  --m-winddown: #8fa58a;
   --radius: 16px;
 }
 * { box-sizing: border-box; }
@@ -133,8 +128,6 @@ button:disabled { cursor: default; opacity: .45; }
 .ev-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; color: var(--muted); margin-bottom: 10px; }
 .ev-meta label { display: flex; align-items: center; gap: 8px; }
 .ev-meta input { padding: 4px 8px; }
-.arc { display: flex; height: 10px; border-radius: 5px; overflow: hidden; gap: 2px; margin-bottom: 12px; }
-.arc span { min-width: 3px; }
 .ev { align-items: flex-start; }
 .ev.dragging { opacity: .4; }
 .ev.current { background: color-mix(in srgb, var(--accent) 10%, transparent); }
@@ -142,18 +135,9 @@ button:disabled { cursor: default; opacity: .45; }
 .handle:hover, .ev.dragging .handle { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .ev.dragging { opacity: 1 !important; background: color-mix(in srgb, var(--accent) 18%, var(--panel-2)); box-shadow: 0 10px 24px rgba(0,0,0,.45); }
 .time { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; width: 40px; flex: none; padding-top: 12px; }
-.moods { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-.mood { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 1px 9px; font-size: 12px; color: var(--muted); }
-.mood.on { color: #14111a; border-color: transparent; font-weight: 600; }
 .ops { display: flex; gap: 4px; flex: none; }
 
-.m-chill { background: var(--m-chill); }
-.m-feels { background: var(--m-feels); }
-.m-groove { background: var(--m-groove); }
-.m-deep { background: var(--m-deep); }
-.m-winddown { background: var(--m-winddown); }
 .m-none { background: var(--line); }
-.mood:not(.on) { background: transparent; }
 
 .remote { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: color-mix(in srgb, var(--panel) 96%, transparent); backdrop-filter: blur(8px); border-top: 1px solid var(--line); }
 .progress { height: 4px; background: var(--line); position: relative; }
@@ -332,14 +316,6 @@ h2, .brand, .ev-title { font-weight: 800; letter-spacing: -.02em; }
 .item:hover { background: var(--panel-2); }
 .art, .now img, .thumb { border-radius: 10px; }
 .ev.current { background: color-mix(in srgb, var(--accent) 14%, var(--panel-2)); box-shadow: inset 3px 0 0 var(--accent); }
-.arc { height: 12px; border-radius: 999px; }
-.mood { border: 0; background: var(--panel-2) !important; }
-.mood.on { background: initial; }
-.mood.on.m-chill { background: var(--m-chill) !important; }
-.mood.on.m-feels { background: var(--m-feels) !important; }
-.mood.on.m-groove { background: var(--m-groove) !important; }
-.mood.on.m-deep { background: var(--m-deep) !important; }
-.mood.on.m-winddown { background: var(--m-winddown) !important; }
 
 /* Booth: pads are dark tiles; a playing pad lights up orange */
 .pad { border: 0; border-radius: 18px; background: var(--panel-2); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }

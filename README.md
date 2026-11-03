@@ -1,6 +1,6 @@
 # Evening Mix
 
-Browse your SoundCloud and Deezer favorites in one searchable list, arrange an evening playlist with start times and mood tags, and play it with crossfades. The server does the playing; any phone or laptop on the LAN is the remote and can listen to the live stream.
+Browse your SoundCloud and Deezer favorites in one searchable list, arrange evening playlists with start times, and play it with crossfades. The server does the playing; any phone or laptop on the LAN is the remote and can listen to the live stream.
 
 Requires Linux with PipeWire or PulseAudio (`pactl`) and `ffmpeg` with libmp3lame.
 

@@ -45,7 +45,6 @@ export interface FavCache {
 }
 
 export interface EveningEntry extends FavItem {
-  mood?: string
   note?: string
   /** Set when the item came from an approved guest request. */
   requestedBy?: string

@@ -18,7 +18,6 @@ interface FavItem {
   trackCount?: number
 }
 interface EveningEntry extends FavItem {
-  mood?: string
   note?: string
   requestedBy?: string
 }
@@ -44,13 +43,6 @@ interface PlatformStatus {
 
 const PLATFORMS: Platform[] = ['soundcloud', 'deezer']
 const LABEL: Record<Platform, string> = { soundcloud: 'SoundCloud', deezer: 'Deezer' }
-const MOODS = [
-  { id: 'chill', label: 'Chill' },
-  { id: 'feels', label: 'Feels' },
-  { id: 'groove', label: 'Groove' },
-  { id: 'deep', label: 'Deep' },
-  { id: 'winddown', label: 'Wind-down' },
-]
 
 // ------------------------------------------------------------------ status
 const status = ref<Record<Platform, PlatformStatus> | null>(null)
@@ -266,7 +258,7 @@ async function askClaude() {
     const pl = doc.value.playlists.find((p) => p.id === target.id) ?? evening.value
     const have = new Set(pl.items.map((i) => i.id))
     const added = r.items.filter((f) => !have.has(f.id))
-    pl.items.push(...added.map((f) => ({ ...f, mood: 'chill' })))
+    pl.items.push(...added)
     aiStatus.value = `+${added.length} in ${(r.ms / 1000).toFixed(0)} s${r.note ? ` · ${r.note}` : ''}`
   } catch (e: any) {
     aiStatus.value = e?.data?.statusMessage || e?.message || 'Claude failed'
@@ -277,7 +269,7 @@ async function askClaude() {
 
 function addToEvening(f: FavItem) {
   if (inEvening.value.has(f.id)) return
-  evening.value.items.push({ ...f, mood: 'chill' })
+  evening.value.items.push({ ...f })
 }
 function removeAt(i: number) {
   evening.value.items.splice(i, 1)
@@ -1201,16 +1193,6 @@ onBeforeUnmount(() => {
           <span>{{ dur(totalSec) }} · ends ~{{ endClock }}</span>
         </div>
 
-        <div v-if="totalSec" class="arc" aria-label="Mood arc over the evening">
-          <span
-            v-for="(it, i) in evening.items"
-            :key="it.id"
-            :class="`m-${it.mood || 'none'}`"
-            :style="{ flexGrow: Math.max(it.durationSec, 60) }"
-            :title="`${clock(schedule[i])} ${it.title}`"
-          />
-        </div>
-
         <ol class="list ev-list">
           <li
             v-for="(it, i) in evening.items"
@@ -1242,17 +1224,6 @@ onBeforeUnmount(() => {
                 <span class="badge" :class="it.platform">{{ it.platform === 'soundcloud' ? 'SC' : 'DZ' }}</span>
                 {{ it.artist }} · {{ dur(it.durationSec) }}
                 <span v-if="it.requestedBy" class="badge req">🙋 {{ it.requestedBy }}</span>
-              </div>
-              <div class="moods">
-                <button
-                  v-for="m in MOODS"
-                  :key="m.id"
-                  class="mood"
-                  :class="[`m-${m.id}`, { on: it.mood === m.id }]"
-                  @click="it.mood = m.id"
-                >
-                  {{ m.label }}
-                </button>
               </div>
             </div>
             <div class="ops">

@@ -159,7 +159,7 @@ export function decide(requestId: string, action: 'approve' | 'reject') {
         const cur = engine.currentId ? ev.items.findIndex((i) => i.id === engine.currentId) : -1
         let pos = cur < 0 ? ev.items.length : cur + 1
         while (cur >= 0 && ev.items[pos]?.requestedBy) pos++
-        ev.items.splice(pos, 0, { ...r.item, mood: 'chill', requestedBy: r.guestName })
+        ev.items.splice(pos, 0, { ...r.item, requestedBy: r.guestName })
       })
     }
     return r
