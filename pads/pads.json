@@ -1,0 +1,14 @@
+[
+  { "id": "fart", "emoji": "💨", "label": "Fart", "file": "fart.mp3" },
+  { "id": "bruh", "emoji": "🗿", "label": "Bruh", "file": "bruh.mp3" },
+  { "id": "spas-12", "emoji": "🔫", "label": "Spas 12", "file": "spas-12.mp3" },
+  { "id": "rizz", "emoji": "😏", "label": "Rizz", "file": "rizz.mp3" },
+  { "id": "romance", "emoji": "💘", "label": "Romanceeee", "file": "romance.mp3" },
+  { "id": "sncf", "emoji": "🚄", "label": "SNCF remix", "file": "sncf.mp3" },
+  { "id": "french-meme", "emoji": "🥖", "label": "French meme", "file": "french-meme.mp3" },
+  { "id": "rap-cinese", "emoji": "🐉", "label": "Rap cinese", "file": "rap-cinese.mp3" },
+  { "id": "german-ringtone", "emoji": "📞", "label": "German ringtone", "file": "german-ringtone.mp3" },
+  { "id": "airhorn", "emoji": "📯", "label": "Airhorn", "file": "airhorn.mp3" },
+  { "id": "badumtss", "emoji": "🥁", "label": "Ba dum tss", "file": "badumtss.mp3" },
+  { "id": "sad-trombone", "emoji": "🎺", "label": "Sad trombone", "file": "sad-trombone.mp3" }
+]

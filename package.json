@@ -1,0 +1,24 @@
+{
+  "name": "evening-mix",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "nuxt dev --host 0.0.0.0",
+    "dev:https": "nuxt dev --host 0.0.0.0 --https --https.cert=data/tls/cert.pem --https.key=data/tls/key.pem",
+    "build": "nuxt build",
+    "start": "HOST=0.0.0.0 PORT=3000 node .output/server/index.mjs",
+    "start:https": "NITRO_SSL_CERT=\"$(cat data/tls/cert.pem)\" NITRO_SSL_KEY=\"$(cat data/tls/key.pem)\" HOST=0.0.0.0 PORT=3000 node .output/server/index.mjs",
+    "postinstall": "nuxt prepare",
+    "cert": "mkdir -p data/tls && openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj /CN=evening-mix -keyout data/tls/key.pem -out data/tls/cert.pem"
+  },
+  "type": "module",
+  "dependencies": {
+    "node-web-audio-api": "^2.2.0",
+    "nuxt": "^4.6.3",
+    "playwright": "^1.64.1",
+    "vue": "^3.5.44"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  },
+  "private": true
+}

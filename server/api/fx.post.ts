@@ -1,0 +1,50 @@
+import { booth, COLORS, type ColorPreset } from '../utils/booth'
+import { engine } from '../utils/engine'
+import { mixer } from '../utils/mixer'
+
+interface FxCommand {
+  action: 'eq' | 'color' | 'duck' | 'padVolume' | 'talkover' | 'echo' | 'echoOut' | 'pad' | 'stopPads'
+  eq?: { low?: number; mid?: number; high?: number }
+  color?: ColorPreset
+  value?: number
+  on?: boolean
+  id?: string
+  /** The page that sent it: it already applied the change, so it skips its own echo. */
+  from?: string
+}
+
+const num = (v: unknown, lo: number, hi: number) => Math.max(lo, Math.min(hi, Number(v) || 0))
+
+export default defineEventHandler(async (event) => {
+  const c = await readBody<FxCommand>(event)
+  await booth.init()
+  const from = typeof c?.from === 'string' ? c.from.slice(0, 40) : undefined
+  switch (c?.action) {
+    case 'eq': {
+      const e = { ...booth.state.eq, ...c.eq }
+      await booth.set({ eq: { low: num(e.low, -26, 6), mid: num(e.mid, -26, 6), high: num(e.high, -26, 6) } }, from)
+      break
+    }
+    case 'color':
+      if (!COLORS.includes(c.color as ColorPreset)) throw createError({ statusCode: 400 })
+      await booth.set({ color: c.color! }, from)
+      break
+    case 'duck': await booth.set({ duckDb: num(c.value, 3, 30) }, from); break
+    case 'padVolume': await booth.set({ padVolume: num(c.value, 0, 1.5) }, from); break
+    case 'talkover': booth.hold('talkover', !!c.on, from); break
+    case 'echo': booth.hold('echo', !!c.on, from); break
+    case 'echoOut':
+      booth.echoOut(from)
+      await engine.echoOut()
+      break
+    case 'pad':
+      if (c.on !== false && !mixer.listenerCount) {
+        throw createError({ statusCode: 409, statusMessage: 'Nobody is listening: tap "Listen here" first' })
+      }
+      await booth.pad(String(c.id), c.on !== false, from)
+      break
+    case 'stopPads': booth.stopPads(from); break
+    default: throw createError({ statusCode: 400, statusMessage: 'unknown action' })
+  }
+  return booth.state
+})
