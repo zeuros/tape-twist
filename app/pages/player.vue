@@ -234,6 +234,31 @@ function onDrop(to: number) {
   evening.value.items.splice(to, 0, it)
 }
 
+// Touch reorder: the ⠿ handle follows the finger (HTML5 drag-and-drop doesn't exist on
+// phones). The item moves as soon as the finger is over another entry.
+function handleDown(e: PointerEvent, i: number) {
+  e.preventDefault()
+  ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+  dragFrom.value = i
+  navigator.vibrate?.(10)
+}
+function handleMove(e: PointerEvent) {
+  const from = dragFrom.value
+  if (from === null) return
+  // Scroll when the finger nears the top, or the player bar at the bottom.
+  if (e.clientY < 70) window.scrollBy(0, -14)
+  else if (e.clientY > window.innerHeight - 190) window.scrollBy(0, 14)
+  const li = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>('li.ev')
+  const to = Number(li?.dataset.i)
+  if (!li || Number.isNaN(to) || to === from) return
+  const [it] = evening.value.items.splice(from, 1)
+  evening.value.items.splice(to, 0, it)
+  dragFrom.value = to
+}
+function handleUp() {
+  dragFrom.value = null
+}
+
 const schedule = computed(() => {
   const [h, m] = evening.value.startTime.split(':').map(Number)
   let t = (h || 0) * 3600 + (m || 0) * 60
@@ -522,6 +547,25 @@ async function fx(action: string, extra: Record<string, unknown> = {}) {
   }
 }
 
+// Pads fire on press with a mouse (instant), but on a touch screen only on a real tap:
+// lifting the finger where it went down. A finger that scrolls the page doesn't fire.
+const padTouches = new Map<number, { x: number; y: number }>()
+const TAP_SLOP = 10
+function padDown(e: PointerEvent, p: Pad) {
+  if (e.pointerType === 'mouse') {
+    e.preventDefault()
+    hitPad(p)
+  } else padTouches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+}
+function padMove(e: PointerEvent) {
+  const t = padTouches.get(e.pointerId)
+  if (t && Math.hypot(e.clientX - t.x, e.clientY - t.y) > TAP_SLOP) padTouches.delete(e.pointerId)
+}
+function padUp(e: PointerEvent, p: Pad) {
+  const t = padTouches.get(e.pointerId)
+  padTouches.delete(e.pointerId)
+  if (t && Math.hypot(e.clientX - t.x, e.clientY - t.y) <= TAP_SLOP) hitPad(p)
+}
 function hitPad(p: Pad) {
   if (!listening.value && !eng.value?.listeners) {
     fxError.value = 'Pads play on the listening devices: tap "Listen here" first.'
@@ -894,7 +938,16 @@ onBeforeUnmount(() => {
             @dragstart="dragFrom = i"
             @dragover.prevent
             @drop="onDrop(i)"
+            :data-i="i"
           >
+            <span
+              class="handle"
+              title="Drag to reorder"
+              @pointerdown="handleDown($event, i)"
+              @pointermove="handleMove"
+              @pointerup="handleUp"
+              @pointercancel="handleUp"
+            >⠿</span>
             <span class="time">{{ clock(schedule[i]) }}</span>
             <button class="art" :title="`Play from ${it.title}`" @click="playNow(it)">
               <img v-if="it.artwork" :src="it.artwork" alt="" loading="lazy">
@@ -944,7 +997,11 @@ onBeforeUnmount(() => {
               class="pad"
               :class="{ live: booth.pads.includes(p.id) }"
               :title="`${p.label} (${p.durationSec?.toFixed(1)} s)`"
-              @pointerdown.prevent="hitPad(p)"
+              @pointerdown="padDown($event, p)"
+              @pointermove="padMove"
+              @pointerup="padUp($event, p)"
+              @pointercancel="padTouches.delete($event.pointerId)"
+              @contextmenu.prevent
             >
               <span class="pad-emoji">{{ p.emoji }}</span>
               <span class="pad-label">{{ p.label }}</span>

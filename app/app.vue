@@ -107,9 +107,12 @@ button:disabled { cursor: default; opacity: .45; }
 .ev-meta input { padding: 4px 8px; }
 .arc { display: flex; height: 10px; border-radius: 5px; overflow: hidden; gap: 2px; margin-bottom: 12px; }
 .arc span { min-width: 3px; }
-.ev { align-items: flex-start; cursor: grab; }
+.ev { align-items: flex-start; }
 .ev.dragging { opacity: .4; }
 .ev.current { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.handle { flex: none; align-self: stretch; display: grid; place-items: center; width: 28px; margin: -7px 0 -7px -7px; color: var(--muted); font-size: 18px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 14px 0 0 14px; }
+.handle:hover, .ev.dragging .handle { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.ev.dragging { opacity: 1 !important; background: color-mix(in srgb, var(--accent) 18%, var(--panel-2)); box-shadow: 0 10px 24px rgba(0,0,0,.45); }
 .time { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; width: 40px; flex: none; padding-top: 12px; }
 .moods { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .mood { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 1px 9px; font-size: 12px; color: var(--muted); }
