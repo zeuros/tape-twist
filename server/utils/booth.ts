@@ -16,7 +16,7 @@ export const PADS_DIR = resolve(process.env.PADS_DIR || 'pads')
 /** Pads recorded from the booth mic: private, next to the rest of the evening's data. */
 export const REC_DIR = join(DATA_DIR, 'pads')
 const REC_LIST = 'recorded-pads.json'
-const REC_MAX_SEC = 4
+const REC_MAX_SEC = 6 // 4 s of voice + the reverb tail
 const HOLD_TIMEOUT = 6000 // a held button must be refreshed within this (lost touch-up safety)
 const run = promisify(execFile)
 

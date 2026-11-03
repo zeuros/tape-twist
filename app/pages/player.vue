@@ -826,7 +826,12 @@ async function savePad() {
   if (!blob || recSaving.value) return
   recSaving.value = true
   try {
-    await $fetch('/api/pads', { method: 'POST', query: { label: recName.value }, body: blob, headers: { 'content-type': blob.type || 'application/octet-stream' } })
+    // The pad gets this device's voice (preset, slapback, reverb), like Talkover.
+    const body = await renderVoicePad(blob, voicePreset.value).catch((e) => {
+      console.error('[pads] voice render', e)
+      return blob
+    })
+    await $fetch('/api/pads', { method: 'POST', query: { label: recName.value }, body, headers: { 'content-type': body.type || 'application/octet-stream' } })
     recBlob.value = null
     await reloadPads()
   } catch (e: any) {
@@ -1286,7 +1291,7 @@ onBeforeUnmount(() => {
               v-else
               class="pad rec"
               :class="{ live: recording }"
-              title="Hold and speak (4 s max): it becomes a pad"
+              title="Hold and speak (4 s max): it becomes a pad, with the voice picked below"
               @pointerdown="recStart"
               @pointerup="recEnd"
               @pointercancel="recEnd"
@@ -1295,6 +1300,9 @@ onBeforeUnmount(() => {
               <span class="pad-emoji">{{ recording ? '⏺️' : '🔴' }}</span>
               <span class="pad-label">{{ recording ? 'Recording…' : 'Hold to record' }}</span>
             </button>
+          </div>
+          <div class="seg voice-seg" role="group" aria-label="Voice for Talkover and recorded pads" title="Your voice, for Talkover and for the pads you record">
+            <button v-for="v in VOICES" :key="v.id" :class="{ on: voicePreset === v.id }" @click="setVoicePreset(v.id)">{{ v.label }}</button>
           </div>
           <label class="slider-row">
             <span>Pads volume</span>
@@ -1312,17 +1320,6 @@ onBeforeUnmount(() => {
               @contextmenu.prevent
             >
               🎙️ <span>Talkover</span><small>hold</small>
-            </button>
-            <button
-              class="hold"
-              :class="{ on: held.echo || booth.echo }"
-              title="Hold: send an echo into the current track"
-              @pointerdown.prevent="holdStart('echo', $event)"
-              @pointerup="holdEnd('echo')"
-              @pointercancel="holdEnd('echo')"
-              @contextmenu.prevent
-            >
-              🌀 <span>Echo</span><small>hold</small>
             </button>
             <button class="hold" title="Echo the current track out and bring in the next one" :disabled="eng?.status !== 'playing'" @click="echoOut">
               🌀⏭ <span>Echo out</span><small>tap</small>
@@ -1360,9 +1357,6 @@ onBeforeUnmount(() => {
             <span>Voice volume</span>
             <input type="range" min="0" max="2" step="0.05" :value="voiceVolume" @change="setVoiceVolume(Number(($event.target as HTMLInputElement).value))">
           </label>
-          <div class="seg voice-seg" role="group" aria-label="Voice">
-            <button v-for="v in VOICES" :key="v.id" :class="{ on: voicePreset === v.id }" @click="setVoicePreset(v.id)">{{ v.label }}</button>
-          </div>
 
           <h3>Colour</h3>
           <div class="seg">

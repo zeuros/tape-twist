@@ -183,8 +183,7 @@ button:disabled { cursor: default; opacity: .45; }
 .pad.live { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent), 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent); }
 .pad-emoji { font-size: 28px; line-height: 1; }
 .pad-label { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.15; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.holds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
-@media (max-width: 520px) { .holds { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.holds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .pad-wrap { position: relative; display: grid; min-width: 0; }
 .pad-wrap .pad { min-width: 0; }
 .pad-del { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; font-size: 11px; line-height: 1; color: var(--muted); background: rgba(0,0,0,.35); }
@@ -195,7 +194,8 @@ button:disabled { cursor: default; opacity: .45; }
 .rec-name input { width: 100%; min-width: 0; border: 0; border-radius: 999px; padding: 6px 10px; font-size: 13px; text-align: center; background: #1c1d21; box-shadow: inset 0 2px 4px rgba(0,0,0,.35); }
 .rec-actions { display: flex; justify-content: center; gap: 6px; }
 .pad.rec { touch-action: none; -webkit-touch-callout: none; }
-.voice-seg { margin-top: 8px; }
+.seg.voice-seg { margin-top: 10px; flex-wrap: nowrap; gap: 4px; }
+.seg.voice-seg button { flex: 1 1 0; min-width: 0; padding: 6px 4px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
 /* XY pad: a touch square, filter on x, resonance + echo on y */
 .xy { position: relative; margin-top: 12px; aspect-ratio: 16 / 10; border-radius: 18px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: crosshair;
   background: radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%), linear-gradient(90deg, color-mix(in srgb, var(--accent) 14%, var(--panel-2)), var(--panel-2) 45% 55%, color-mix(in srgb, var(--accent-2) 14%, var(--panel-2)));

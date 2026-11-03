@@ -90,7 +90,6 @@ export class BoothAudio {
   private duck: GainNode
   private brakeDelay: DelayNode
   private brakeGain: GainNode
-  private braking = false
   private djLp: BiquadFilterNode
   private djHp: BiquadFilterNode
   private echoFb: GainNode[] = []
@@ -259,26 +258,11 @@ export class BoothAudio {
       this.presetGains[p] = gain(p === 'tannoy' ? 1 : 0, fx)
       this.presetGains[p].connect(presetsOut)
     }
-    comp.connect(this.presetGains.tannoy)
-    // Robot: ring modulation (voice × 60 Hz sine) into a short metallic comb.
-    const ring = gain(0, fx)
-    const carrier = fx.createOscillator()
-    carrier.frequency.value = 60
-    carrier.connect(ring.gain)
-    carrier.start()
-    const comb = fx.createDelay(0.05)
-    comb.delayTime.value = 0.008
-    const combFb = gain(0.55, fx)
-    comp.connect(ring).connect(comb).connect(combFb).connect(comb)
-    ring.connect(this.presetGains.robot)
-    comb.connect(this.presetGains.robot)
-    // Chipmunk and monster: pitch shifted up a fifth / down a tritone (+ chest).
-    const up = pitchShifter(fx, 7)
-    comp.connect(up.input)
-    up.output.connect(this.presetGains.chipmunk)
-    const down = pitchShifter(fx, -6)
-    comp.connect(down.input)
-    down.output.connect(biquad(fx, 'lowshelf', 220, Math.SQRT1_2, 7)).connect(this.presetGains.monster)
+    for (const p of VOICE_PRESETS) {
+      const v = voicePreset(fx, p)
+      comp.connect(v.input)
+      v.output.connect(this.presetGains[p])
+    }
     presetsOut.connect(this.voiceGate).connect(this.voiceLevel)
     this.voiceLevel.connect(fxOut) // dry
     // Slapback: the tannoy bouncing off the stalls.
@@ -474,27 +458,46 @@ export class BoothAudio {
   }
 
   /** Tape stop while held; on release it spins back up and is live (in sync) again. */
+  /** Where the brake automation started, to know its values at any time (see brakeAt). */
+  private brakeSeg = { on: false, t0: 0, d0: 0, g0: 1 }
+
+  /** Brake delay and gain at time t, from the running segment (computed, not read back:
+   *  reading AudioParam.value mid-automation isn't reliable across browsers). */
+  private brakeAt(t: number) {
+    const { on, t0, d0, g0 } = this.brakeSeg
+    const s = Math.max(0, t - t0)
+    if (on) {
+      const k = Math.min(s, BRAKE_SEC)
+      const fadeAt = BRAKE_SEC * 0.7
+      return { d: d0 + (k * k) / (2 * BRAKE_SEC), g: s < fadeAt ? g0 : g0 * Math.exp(-(s - fadeAt) / 0.08) }
+    }
+    return { d: d0 * (1 - Math.min(1, s / SPINUP_SEC)), g: g0 + (1 - g0) * Math.min(1, s / 0.06) }
+  }
+
   setBrake(on: boolean) {
-    if (on === this.braking) return
-    this.braking = on
+    if (on === this.brakeSeg.on) return
     const t = this.ctx.currentTime
+    const now = this.brakeAt(t)
+    this.brakeSeg = { on, t0: t, d0: now.d, g0: now.g }
     const d = this.brakeDelay.delayTime
     const g = this.brakeGain.gain
-    const from = d.value
-    d.cancelScheduledValues(t)
-    g.cancelScheduledValues(t)
-    g.setValueAtTime(g.value, t)
+    // Restart both from their computed current values.
+    d.cancelScheduledValues(0)
+    g.cancelScheduledValues(0)
+    g.setValueAtTime(now.g, t)
     if (on) {
       // delay = s²/2D: its growth rate climbs from 0 to 1, so the speed (1 − rate) falls from 1 to 0.
-      const n = 128
-      const curve = Float32Array.from({ length: n }, (_, i) => {
-        const s = (i / (n - 1)) * BRAKE_SEC
-        return from + (s * s) / (2 * BRAKE_SEC)
-      })
-      d.setValueCurveAtTime(curve, t, BRAKE_SEC)
+      // Built from short linear ramps, not setValueCurveAtTime: Firefox can't cancel a curve
+      // that has started, so letting go early threw and left the music faded and late.
+      d.setValueAtTime(now.d, t)
+      const n = 40
+      for (let i = 1; i <= n; i++) {
+        const s = (i / n) * BRAKE_SEC
+        d.linearRampToValueAtTime(now.d + (s * s) / (2 * BRAKE_SEC), t + s)
+      }
       g.setTargetAtTime(0, t + BRAKE_SEC * 0.7, 0.08)
     } else {
-      d.setValueAtTime(from, t)
+      d.setValueAtTime(now.d, t)
       d.linearRampToValueAtTime(0, t + SPINUP_SEC)
       g.linearRampToValueAtTime(1, t + 0.06)
     }
@@ -569,7 +572,7 @@ export class BoothAudio {
     this.voicePreset = p
     for (const k of VOICE_PRESETS) this.glide(this.presetGains[k].gain, k === p ? 1 : 0, 0.03, this.fx)
     // Less tannoy room on the robot, a little less on the shifted voices (they're busy already).
-    const [slap, verb] = ({ tannoy: [0.35, 0.55], robot: [0.12, 0.25], chipmunk: [0.25, 0.4], monster: [0.25, 0.45] } as const)[p]
+    const [slap, verb] = ROOM[p]
     this.glide(this.slapOut.gain, slap, 0.03, this.fx)
     this.glide(this.verbOut.gain, verb, 0.03, this.fx)
   }
@@ -669,7 +672,112 @@ const MAX_NOTCHES = 6
  * rate (that rate is the speed change), each faded in and out, half a cycle apart, so one
  * is always mid-sweep while the other jumps back. ~0.1 s of delay: fine for a voice.
  */
-function pitchShifter(ctx: AudioContext, semitones: number) {
+/** Less tannoy room (slapback, reverb) on the robot, a little less on the shifted voices. */
+const ROOM: Record<VoicePreset, readonly [number, number]> = { tannoy: [0.35, 0.55], robot: [0.12, 0.25], chipmunk: [0.25, 0.4], monster: [0.25, 0.45] }
+
+/** One voice character, between the cleaned-up voice and the room. */
+function voicePreset(ctx: BaseAudioContext, p: VoicePreset) {
+  const input = ctx.createGain()
+  const output = ctx.createGain()
+  if (p === 'tannoy') {
+    input.connect(output)
+  } else if (p === 'robot') {
+    // Ring modulation (voice × 60 Hz sine) into a short metallic comb.
+    const ring = ctx.createGain()
+    ring.gain.value = 0
+    const carrier = ctx.createOscillator()
+    carrier.frequency.value = 60
+    carrier.connect(ring.gain)
+    carrier.start()
+    const comb = ctx.createDelay(0.05)
+    comb.delayTime.value = 0.008
+    const combFb = ctx.createGain()
+    combFb.gain.value = 0.55
+    input.connect(ring).connect(comb).connect(combFb).connect(comb)
+    ring.connect(output)
+    comb.connect(output)
+  } else if (p === 'chipmunk') {
+    // Up a fifth.
+    const up = pitchShifter(ctx, 7)
+    input.connect(up.input)
+    up.output.connect(output)
+  } else {
+    // Monster: down a tritone, more chest.
+    const down = pitchShifter(ctx, -6)
+    input.connect(down.input)
+    down.output.connect(biquad(ctx, 'lowshelf', 220, Math.SQRT1_2, 7)).connect(output)
+  }
+  return { input, output }
+}
+
+/**
+ * A recorded pad with this device's voice: cleanup, preset, slapback and funfair reverb,
+ * rendered offline (no live audio needed). Returns a mono 16-bit WAV.
+ */
+export async function renderVoicePad(recording: Blob, p: VoicePreset): Promise<Blob> {
+  const rate = 48000
+  const src = await new OfflineAudioContext(1, rate, rate).decodeAudioData(await recording.arrayBuffer())
+  const tail = 1.5
+  const ctx = new OfflineAudioContext(1, Math.ceil((src.duration + tail) * rate), rate)
+  const player = ctx.createBufferSource()
+  player.buffer = src
+  const comp = ctx.createDynamicsCompressor()
+  comp.threshold.value = -26
+  comp.ratio.value = 6
+  comp.attack.value = 0.003
+  comp.release.value = 0.15
+  comp.knee.value = 6
+  player
+    .connect(biquad(ctx, 'highpass', 170)).connect(biquad(ctx, 'highpass', 170))
+    .connect(biquad(ctx, 'peaking', 2800, 0.9, 5)).connect(biquad(ctx, 'lowpass', 7500))
+    .connect(comp)
+  const v = voicePreset(ctx, p)
+  comp.connect(v.input)
+  // The tail fades out so the reverb doesn't end in a cut.
+  const out = ctx.createGain()
+  const end = src.duration + tail
+  out.gain.setValueAtTime(1, end - 0.6)
+  out.gain.linearRampToValueAtTime(0, end)
+  out.connect(ctx.destination)
+  v.output.connect(out) // dry
+  const [slapAmt, verbAmt] = ROOM[p]
+  const slap = ctx.createDelay(1)
+  slap.delayTime.value = 0.13
+  const slapFb = ctx.createGain()
+  slapFb.gain.value = 0.3
+  const slapTone = biquad(ctx, 'lowpass', 3000)
+  v.output.connect(slap)
+  slap.connect(slapTone).connect(slapFb).connect(slap)
+  const slapOut = ctx.createGain()
+  slapOut.gain.value = slapAmt
+  slapTone.connect(slapOut).connect(out)
+  const verb = ctx.createConvolver()
+  verb.buffer = funfairReverb(ctx)
+  const verbOut = ctx.createGain()
+  verbOut.gain.value = verbAmt
+  v.output.connect(verb)
+  slapOut.connect(verb)
+  verb.connect(verbOut).connect(out)
+  player.start()
+  return wav(await ctx.startRendering())
+}
+
+function wav(buf: AudioBuffer) {
+  const d = buf.getChannelData(0)
+  let peak = 0
+  for (const x of d) peak = Math.max(peak, Math.abs(x))
+  const k = peak > 0 ? 0.9 / peak : 1
+  const out = new DataView(new ArrayBuffer(44 + d.length * 2))
+  const str = (o: number, t: string) => [...t].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)))
+  str(0, 'RIFF'); out.setUint32(4, 36 + d.length * 2, true); str(8, 'WAVEfmt ')
+  out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true)
+  out.setUint32(24, buf.sampleRate, true); out.setUint32(28, buf.sampleRate * 2, true)
+  out.setUint16(32, 2, true); out.setUint16(34, 16, true); str(36, 'data'); out.setUint32(40, d.length * 2, true)
+  for (let i = 0; i < d.length; i++) out.setInt16(44 + i * 2, Math.max(-1, Math.min(1, d[i]! * k)) * 0x7fff, true)
+  return new Blob([out.buffer], { type: 'audio/wav' })
+}
+
+function pitchShifter(ctx: BaseAudioContext, semitones: number) {
   const ratio = Math.pow(2, semitones / 12)
   const win = 0.1
   const period = win / Math.abs(1 - ratio)
@@ -714,7 +822,7 @@ function biquad(ctx: BaseAudioContext, type: BiquadFilterType, f: number, q = Ma
 }
 
 /** Fairground tannoy reverb: early slaps off the stalls, then a long bright tail (2.6 s). */
-function funfairReverb(ctx: AudioContext) {
+function funfairReverb(ctx: BaseAudioContext) {
   const sr = ctx.sampleRate
   const len = Math.floor(sr * 2.6)
   const buf = ctx.createBuffer(2, len, sr)
