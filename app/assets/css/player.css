@@ -144,3 +144,4 @@
 .qr-hint { margin: 12px 0 2px; font-weight: 800; font-size: 20px; letter-spacing: -.01em; }
 .qr-url { margin: 0; font-size: 14px; color: #555; word-break: break-all; }
 .qr-close { color: var(--muted); font-size: 13px; }
+.xfade .auto-sync { padding: 4px 10px; font-size: 12px; min-width: 4.5em; }

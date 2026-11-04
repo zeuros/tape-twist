@@ -14,6 +14,7 @@
 
 import type { ColorPreset, Eq, VoicePreset, XY } from '#shared/types/booth'
 import { biquad, dbToGain, driveCurve, gainNode, noiseBuffer, softLimitCurve } from './booth/dsp'
+import { measureRoom } from './booth/autoSync'
 import { VoiceChannel } from './booth/voice'
 
 export interface PadInfo {
@@ -84,6 +85,9 @@ export class BoothAudio {
   private xyEcho = 0
   private padGain: GainNode
   private out: GainNode
+  private head: GainNode
+  private syncMute: GainNode
+  private preOut: GainNode
 
   /** Talkover mic, mixed on this device only, after the duck. */
   private talk: VoiceChannel
@@ -111,7 +115,7 @@ export class BoothAudio {
     this.brakeDelay = ctx.createDelay(2)
     this.brakeDelay.delayTime.value = 0
     this.brakeGain = gain()
-    const head = gain()
+    const head = (this.head = gain())
     src.connect(this.brakeDelay).connect(this.brakeGain).connect(head)
 
     // Music sum: the stream plus the echo returns.
@@ -188,10 +192,11 @@ export class BoothAudio {
     // Music out; a soft limiter keeps it from clipping.
     this.out = gain()
     this.duck.connect(this.out)
-    const pre = gain(0.5)
+    const pre = (this.preOut = gain(0.5))
     const limiter = ctx.createWaveShaper()
     limiter.curve = softLimitCurve()
-    this.out.connect(pre).connect(limiter).connect(ctx.destination)
+    this.syncMute = gain()
+    this.out.connect(this.syncMute).connect(pre).connect(limiter).connect(ctx.destination)
     this.master = limiter
 
     // Instant side (low-latency context): pads and voice, added on top of the music.
@@ -239,6 +244,19 @@ export class BoothAudio {
   outputLatency() {
     const c = this.ctx as AudioContext & { outputLatency?: number }
     return (c.outputLatency || 0) + (c.baseLatency || 0)
+  }
+
+  /**
+   * Auto-sync (app/utils/booth/autoSync.ts): goes quiet for a few seconds, listens to the
+   * room with the mic, and returns how many seconds to add to this device's "ahead".
+   */
+  measureRoom() {
+    return measureRoom(this.ctx, {
+      tap: this.head,
+      inject: this.preOut,
+      mute: (on) => this.glide(this.syncMute.gain, on ? 0 : 1, 0.02),
+      outputLatency: () => this.outputLatency(),
+    })
   }
 
   close() {

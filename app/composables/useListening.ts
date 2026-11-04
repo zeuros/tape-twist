@@ -5,6 +5,10 @@ import type { LiveAudio, SyncInfo } from '~/utils/liveAudio'
  * device (~1.2 s behind the server, app/utils/liveAudio.ts), with the booth effects played
  * on top of it (app/utils/boothAudio.ts).
  */
+/** Range of the sync slider, in seconds. */
+export const AHEAD_MIN = -0.2
+export const AHEAD_MAX = 0.5
+
 export const useListening = defineSingleton(() => {
   const listening = ref(false)
   const audioState = ref<'off' | 'connecting' | 'on'>('off')
@@ -28,6 +32,29 @@ export const useListening = defineSingleton(() => {
   function setAhead(v: number) {
     ahead.value = v
     writePref('ahead', String(v))
+  }
+
+  /** Auto-sync with the mic: 'busy' while listening, then a short note on the outcome. */
+  const autoSync = ref<{ busy: boolean; note: string }>({ busy: false, note: '' })
+  let noteTimer: ReturnType<typeof setTimeout> | undefined
+  async function runAutoSync() {
+    if (!audio || !listening.value || autoSync.value.busy) return
+    clearTimeout(noteTimer)
+    autoSync.value = { busy: true, note: 'listening to the room…' }
+    let note: string
+    try {
+      const r = await audio.measureRoom()
+      const want = ahead.value + r.shift
+      const v = Math.round(Math.min(AHEAD_MAX, Math.max(AHEAD_MIN, want)) / 0.005) * 0.005
+      setAhead(Number(v.toFixed(3)))
+      note = want > AHEAD_MAX || want < AHEAD_MIN
+        ? `auto: needs ${Math.round(want * 1000)} ms, out of range`
+        : `auto-synced${r.loopback ? '' : ' (own speaker not heard: estimate)'}`
+    } catch (e) {
+      note = `auto-sync failed: ${(e as Error).message}`
+    }
+    autoSync.value = { busy: false, note }
+    noteTimer = setTimeout(() => (autoSync.value.note = ''), 10000)
   }
 
   const syncLabel = computed(() => {
@@ -105,5 +132,5 @@ export const useListening = defineSingleton(() => {
     audio = null
   }
 
-  return { listening, audioState, lag, ahead, setAhead, syncLabel, setElement, getAudio, liveLag, start, stop, onTrouble, onVisible, close }
+  return { listening, audioState, lag, ahead, setAhead, autoSync, runAutoSync, syncLabel, setElement, getAudio, liveLag, start, stop, onTrouble, onVisible, close }
 })

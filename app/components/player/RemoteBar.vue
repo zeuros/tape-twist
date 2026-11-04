@@ -2,7 +2,7 @@
 /** The floating player bar: progress, now playing, transport, crossfade, Listen here, sync. */
 const { eng, busy, command, loadingItem, togglePlay, shownPos, setCrossfade } = useEngine()
 const listen = useListening()
-const { listening, audioState, lag, ahead, syncLabel, setAhead } = listen
+const { listening, audioState, lag, ahead, syncLabel, setAhead, autoSync } = listen
 const { evening } = useEvening()
 const num = (e: Event) => Number((e.target as HTMLInputElement).value)
 
@@ -91,8 +91,16 @@ function onSeek(ev: MouseEvent) {
           class="xfade ahead"
           title="Play this device earlier, to catch up with the others when its speaker adds delay (Bluetooth: often 100–300 ms). Drag until the speakers sound as one."
         >
-          <span>{{ ahead > 0 ? 'Ahead' : ahead < 0 ? 'Behind' : 'Sync' }} {{ Math.round(Math.abs(ahead) * 1000) }} ms<small v-if="syncLabel"> · {{ syncLabel }}</small></span>
-          <input type="range" min="-0.2" max="0.5" step="0.005" :value="ahead" @input="setAhead(num($event))" @dblclick="setAhead(0)">
+          <span>{{ ahead > 0 ? 'Ahead' : ahead < 0 ? 'Behind' : 'Sync' }} {{ Math.round(Math.abs(ahead) * 1000) }} ms<small v-if="autoSync.note"> · {{ autoSync.note }}</small><small v-else-if="syncLabel"> · {{ syncLabel }}</small></span>
+          <input type="range" :min="AHEAD_MIN" :max="AHEAD_MAX" step="0.005" :value="ahead" :disabled="autoSync.busy" @input="setAhead(num($event))" @dblclick="setAhead(0)">
+          <button
+            class="ghost auto-sync"
+            :disabled="autoSync.busy || audioState !== 'on'"
+            title="Auto-sync: this device goes quiet for ~8 s, listens to the other speakers with the mic, plays a few short beeps to time its own speaker, then sets the slider. Hold it where you'll listen."
+            @click.prevent="listen.runAutoSync()"
+          >
+            <i v-if="autoSync.busy" class="spin" /><template v-else>🎯 Auto</template>
+          </button>
         </label>
       </div>
     </div>
