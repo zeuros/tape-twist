@@ -25,6 +25,7 @@ const { status, loginOpen, platformState, connect } = usePlatforms()
           {{ status?.[p]?.connected && platformState(p).tone === 'ok' ? 'Login' : 'Connect' }}
         </button>
       </div>
+      <PlayerGuestQr />
     </div>
   </header>
 

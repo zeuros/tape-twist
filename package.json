@@ -16,6 +16,7 @@
     "node-web-audio-api": "^2.2.0",
     "nuxt": "^4.6.3",
     "playwright": "^1.64.1",
+    "qrcode": "^1.5.4",
     "vue": "^3.5.44"
   },
   "allowScripts": {
@@ -24,6 +25,7 @@
   "private": true,
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@types/qrcode": "^1.5.6",
     "typescript": "^6.0.3",
     "vue-tsc": "^3.3.14"
   }

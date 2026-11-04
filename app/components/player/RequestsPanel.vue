@@ -2,16 +2,8 @@
 /** Guest requests waiting for the host, and the recently decided ones. */
 const { pending, decided, decide } = useRequests()
 
-// The address to give guests: this one, or the LAN address when opened as localhost.
-const lanIp = ref<string | null>(null)
-const guestUrl = computed(() => {
-  const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
-  const host = local && lanIp.value ? `${lanIp.value}${location.port ? `:${location.port}` : ''}` : location.host
-  return `${location.protocol}//${host}/`
-})
-onMounted(async () => {
-  lanIp.value = (await $fetch<string[]>('/api/lan').catch(() => []))[0] ?? null
-})
+const { guestUrl, load } = useGuestUrl()
+onMounted(load)
 </script>
 
 <template>

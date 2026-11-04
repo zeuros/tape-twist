@@ -19,6 +19,7 @@
   .conns { width: 100%; flex-wrap: nowrap; }
   .conn { flex: 1; gap: 8px; padding-left: 10px; }
   .conn button { white-space: nowrap; }
+  .qr-btn { width: 44px; }
   .conn-text small { max-width: 100%; }
   .ops { flex-direction: column; }
   .time { width: 34px; }
