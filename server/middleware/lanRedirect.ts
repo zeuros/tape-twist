@@ -15,6 +15,6 @@ export default defineEventHandler(async (event) => {
   if (!client || !/^\d+\.\d+\.\d+\.\d+$/.test(client)) return
   // Wait a little for the first public-IP lookup, but never hold a page for long.
   const home = await Promise.race([homePublicIp(), new Promise<null>((r) => setTimeout(() => r(null), 3000))])
-  const lan = lanOrigin()
+  const lan = await lanOrigin()
   if (home && lan && client === home) return sendRedirect(event, lan + event.path, 302)
 })

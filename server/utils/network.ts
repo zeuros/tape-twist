@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { request as httpsRequest } from 'node:https'
 import { networkInterfaces } from 'node:os'
 import { promisify } from 'node:util'
 
@@ -14,12 +15,25 @@ export function lanAddresses(): string[] {
   return [...ips.filter(home), ...ips.filter((ip) => !home(ip))]
 }
 
-/** The LAN address the server answers on, e.g. https://192.168.1.175:3000 (null when there's none). */
-export function lanOrigin(): string | null {
+/**
+ * The LAN address the server answers on, e.g. https://192.168.1.175:3000 (null when there's none).
+ * Whether it's https is checked once by asking ourselves on 127.0.0.1, so it's right however
+ * the server was started (start:https, nuxt dev --https, plain http…).
+ */
+let scheme: Promise<'https' | 'http'> | null = null
+export async function lanOrigin(): Promise<string | null> {
   const ip = lanAddresses().find((a) => /^(192\.168|10)\./.test(a))
   if (!ip) return null
-  const scheme = process.env.NITRO_SSL_CERT ? 'https' : 'http'
-  return `${scheme}://${ip}:${process.env.PORT || 3000}`
+  const port = Number(process.env.PORT || process.env.NUXT_PORT || 3000)
+  scheme ??= new Promise((resolve) => {
+    const req = httpsRequest({ host: '127.0.0.1', port, path: '/api/lan', rejectUnauthorized: false, timeout: 2000 }, (res) => {
+      res.resume()
+      resolve('https')
+    })
+    req.on('error', () => resolve('http')).on('timeout', () => req.destroy())
+    req.end()
+  })
+  return `${await scheme}://${ip}:${port}`
 }
 
 /**
