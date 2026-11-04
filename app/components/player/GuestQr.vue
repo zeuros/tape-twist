@@ -1,9 +1,14 @@
 <script setup lang="ts">
-/** A small QR button; opens the /player link as a full-screen QR code to scan with a phone. */
+/**
+ * A small QR button; opens the /player link as a full-screen QR code to scan with a phone.
+ * With Tailscale it's the short Funnel name (https://c-j.tailXXXX.ts.net/player): phones on the home
+ * Wi-Fi get redirected to the LAN address by the server, the others stay on Funnel.
+ */
 import QRCode from 'qrcode'
 
 const { guestUrl, load } = useGuestUrl()
-const playerUrl = computed(() => `${guestUrl.value}player`)
+const tsHost = ref<string | null>(null)
+const playerUrl = computed(() => (tsHost.value ? `https://${tsHost.value}/player` : `${guestUrl.value}player`))
 const open = ref(false)
 const svg = ref('')
 
@@ -15,9 +20,10 @@ watch([open, playerUrl], async () => {
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape') open.value = false
 }
-onMounted(() => {
-  load()
+onMounted(async () => {
   document.addEventListener('keydown', onKey)
+  load()
+  tsHost.value = (await $fetch<{ host: string | null }>('/api/tailscale-host').catch(() => null))?.host ?? null
 })
 onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 </script>

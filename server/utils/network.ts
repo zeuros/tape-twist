@@ -39,3 +39,18 @@ export function homePublicIp(): Promise<string | null> {
   }
   return publicIp.value
 }
+
+/** This machine's Tailscale name (e.g. c-j.tail1234.ts.net), the address Funnel publishes; null without Tailscale. */
+let tsHost: Promise<string | null> | null = null
+export function tailscaleHost(): Promise<string | null> {
+  tsHost ??= run('tailscale', ['status', '--json'], { timeout: 10_000 })
+    .then(({ stdout }) => {
+      const name = (JSON.parse(stdout) as { Self?: { DNSName?: string } }).Self?.DNSName ?? ''
+      return name.replace(/\.$/, '') || null
+    })
+    .catch(() => {
+      tsHost = null // try again next time
+      return null
+    })
+  return tsHost
+}
