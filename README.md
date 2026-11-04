@@ -86,6 +86,10 @@ One line at the top of each playlist: a request ("calm bass music for ambience. 
 
 Guests get a cookie ID, with no account needed. Asking for a track that's already requested counts as a vote. Each guest can have at most 5 pending requests. Approving a request inserts it right after the current track, behind earlier approved requests. The evening list has a revision number, so two open players (or a player plus approvals) never silently overwrite each other.
 
+### Reaching it from outside (Tailscale Funnel)
+
+`tailscale funnel --bg https+insecure://localhost:3000` publishes the app at `https://<machine>.<tailnet>.ts.net`. Anyone with that link can use it, `/player` included, so turn it off after the party (`tailscale funnel reset`). A visitor who opens the ts.net link from the home Wi-Fi is sent to the LAN address (`https://192.168.1.x:3000`) so the stream doesn't go out to the internet and back: Funnel passes the visitor's address, and the server compares it with the home's public IP from `tailscale netcheck`. Set `LAN_REDIRECT=0` to turn that off. The QR button in the player header shows the `/player` link as a QR code.
+
 ## Project layout
 
 ```
