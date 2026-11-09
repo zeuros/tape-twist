@@ -10,7 +10,8 @@
     "typecheck": "nuxt typecheck",
     "postinstall": "nuxt prepare",
     "cert": "mkdir -p data/tls && openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj /CN=evening-mix -keyout data/tls/key.pem -out data/tls/cert.pem",
-    "test": "vitest run"
+    "test": "vitest run",
+    "serve": "scripts/serve.sh"
   },
   "type": "module",
   "dependencies": {

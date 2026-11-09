@@ -13,10 +13,14 @@ npm install
 npx playwright install chromium   # the hidden player decks
 npm run cert                      # self-signed certificate in data/tls/
 
-npm run dev:https                 # https://<this-machine-ip>:3000, reachable on the LAN
-# or
-npm run build && npm run start:https
+npm run serve                     # build, then https://<this-machine-ip>:3000 on the LAN
+                                  # plus the Tailscale Funnel (see below); -- --no-build skips the build
+# while developing
+npm run dev:https                 # same address, hot reload
 ```
+
+`npm run serve` sets the Funnel with `--bg`, so tailscaled keeps it across restarts and only the
+first run asks for sudo (`sudo tailscale set --operator=$USER` once makes it never ask).
 
 The app is served over HTTPS because browsers only give the microphone (Talkover) to `https://` pages. Each phone shows a certificate warning once: accept it.
 
