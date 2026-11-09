@@ -9,10 +9,12 @@
     "start:https": "NITRO_SSL_CERT=\"$(cat data/tls/cert.pem)\" NITRO_SSL_KEY=\"$(cat data/tls/key.pem)\" HOST=0.0.0.0 PORT=3000 node .output/server/index.mjs",
     "typecheck": "nuxt typecheck",
     "postinstall": "nuxt prepare",
-    "cert": "mkdir -p data/tls && openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj /CN=evening-mix -keyout data/tls/key.pem -out data/tls/cert.pem"
+    "cert": "mkdir -p data/tls && openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj /CN=evening-mix -keyout data/tls/key.pem -out data/tls/cert.pem",
+    "test": "vitest run"
   },
   "type": "module",
   "dependencies": {
+    "mpg123-decoder": "^1.0.3",
     "node-web-audio-api": "^2.2.0",
     "nuxt": "^4.6.3",
     "playwright": "^1.64.1",
@@ -27,6 +29,7 @@
     "@types/node": "^26.6.6",
     "@types/qrcode": "^1.5.6",
     "typescript": "^6.0.3",
+    "vitest": "^5.1.0",
     "vue-tsc": "^3.3.14"
   }
 }

@@ -44,7 +44,7 @@ The app is served over HTTPS because browsers only give the microphone (Talkover
 - **Crossfades:** the next item is preloaded on the idle deck. When the current item is `crossfade` seconds from its end, the two sinks are ramped with equal-power curves. Deezer→Deezer can't overlap (one stream per account), so it fades out, then in, on the same deck.
 - **Listen here** plays the live mix on that device (`app/utils/liveAudio.ts`). Lock-screen and headset buttons control the server.
   - Chrome: `/api/stream` (MP3), fed to the `<audio>` element through Media Source Extensions.
-  - Firefox and iPhones (no MP3 in Media Source Extensions): `/api/stream?format=pcm`, the same audio as raw 16-bit PCM (~1.5 Mbit/s per device, fine on a LAN). The page cuts it into 0.1 s blocks and schedules each one with Web Audio at its exact time. The final mix then plays out through a hidden `<audio>` element (a MediaStream), because Firefox on Android suspends pure Web Audio when the screen goes off but keeps a playing media element alive.
+  - Firefox and iPhones (no MP3 in Media Source Extensions): the same MP3 stream, decoded in the page by mpg123 compiled to WebAssembly (`mpg123-decoder`), frame by frame. Every frame counts 1152 samples even if it fails to decode, so the timeline never shifts; the decoder's output is 1105 samples late (LAME's encoder delay plus the decoder's), which the page takes off. The page cuts it into 0.1 s blocks and schedules each one with Web Audio at its exact time. Without WebAssembly it falls back to `/api/stream?format=pcm`, the same audio as raw 16-bit PCM (~1.5 Mbit/s per device instead of 0.2). An inaudible looping media element keeps the page alive with the screen off: Firefox on Android only keeps "real" media playing (not Web Audio, not a MediaStream).
 - **Sync:** every listening device plays the same instant, 1.2 s behind the server, so several phones on several speakers sound as one.
   - The MP3 is constant bitrate (every 576-byte frame is 1152 samples), so a byte offset is a sample position. The server records when each sample was rendered on its clock and tells each new stream which sample it starts at (`x-stream-start`); `/api/clock` gives its time.
   - Each page measures its clock offset to the server (NTP-style, best of several round trips, refreshed every 10 s) and plays sample s at the agreed time, minus its own audio output latency. MP3: small errors are steered out with the element's playback rate (≤2 %), big ones (a stall) with a jump. PCM: blocks are butted together and steered with ≤0.5 % rate changes, big errors reschedule. A new stream starts from a 3–4 s backlog, so a phone joins in sync at once.
@@ -101,7 +101,8 @@ app/
   composables/       state and logic, one concern each: usePlatforms, useEvening, useEngine,
                      useListening, useBooth, useVoice, useRequests (shared by the whole page),
                      useFavoriteSearch, usePadRecorder, useConfirmTap (per component)
-  utils/             framework-free code: liveAudio / livePcm / serverClock (synced playback),
+  utils/             framework-free code: liveAudio / livePcm / pcmBlocks / pcmScheduler /
+                     serverClock (synced playback),
                      boothAudio + booth/ (dsp, voice) (Web Audio effects), format, prefs
   assets/css/        base, player, booth, responsive, guest
 server/
@@ -110,7 +111,9 @@ server/
                      soundcloud, deezer), claudeMix
 ```
 
-`npm run typecheck` checks the whole project (vue-tsc).
+`npm run typecheck` checks the whole project (vue-tsc). `npm test` runs the unit tests (vitest,
+`test/`): stream decoding and sample numbering (with the real ffmpeg encoder when it is
+installed) and the Web Audio block scheduler.
 
 ## Notes
 

@@ -87,7 +87,7 @@ export const useListening = defineSingleton(() => {
     audio.keepAlive(!mse)
     live = mse
       ? playLive(el, `/api/stream?t=${Date.now()}`, onTrouble, opts)
-      : playPcm(audio.ctx, audio.musicIn, `/api/stream?format=pcm&t=${Date.now()}`, onTrouble, opts)
+      : playPcm(audio.ctx, audio.musicIn, `/api/stream?t=${Date.now()}`, onTrouble, opts)
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'
     clearInterval(lagTimer)
     lagTimer = setInterval(() => {

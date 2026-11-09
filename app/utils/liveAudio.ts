@@ -11,9 +11,8 @@
  * `ahead` (seconds, per device) plays this device earlier, for speakers that add their own
  * delay (Bluetooth: 0.1–0.3 s).
  *
- * Browsers without MP3 in MSE (Firefox, iPhones) get the same audio as raw PCM instead
+ * Browsers without MP3 in MSE (Firefox, iPhones) decode the same MP3 in the page instead
  * (playPcm, app/utils/livePcm.ts): blocks of 0.1 s, each scheduled with Web Audio at its exact shared time.
- * That's ~1.5 Mbit/s per device, fine on a LAN.
  */
 
 import { ServerClock } from './serverClock'

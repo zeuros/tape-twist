@@ -10,6 +10,7 @@ import {
   WaveShaperNode,
 } from 'node-web-audio-api'
 import { SINKS, type SinkName } from './audio'
+import { MP3_ENCODE_ARGS } from './mp3'
 
 /**
  * Live mixer, a Web Audio graph rendered natively (node-web-audio-api, Rust):
@@ -267,12 +268,7 @@ class Mixer {
       '-filter_complex', '[0:a][1:a]amerge=inputs=2[m]', '-map', '[m]',
       '-c:a', 'pcm_f32le', '-f', 'f32le', 'pipe:1',
     ], { stdio: ['ignore', 'pipe', 'pipe'] })
-    const encoder = spawn('ffmpeg', [
-      '-hide_banner', '-loglevel', 'error',
-      '-f', 'f32le', '-ar', String(SR), '-ac', '2', '-i', 'pipe:0',
-      '-c:a', 'libmp3lame', '-b:a', '192k', '-flush_packets', '1',
-      '-id3v2_version', '0', '-write_xing', '0', '-f', 'mp3', 'pipe:1', // bare frames only
-    ], { stdio: ['pipe', 'pipe', 'pipe'] })
+    const encoder = spawn('ffmpeg', MP3_ENCODE_ARGS, { stdio: ['pipe', 'pipe', 'pipe'] })
     this.capture = capture
     this.encoder = encoder
     try {
