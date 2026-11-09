@@ -63,8 +63,7 @@ export class BoothAudio {
   readonly fx: AudioContext
   readonly musicIn: GainNode
   private master: AudioNode
-  private sinkEl: HTMLAudioElement | null = null
-  private sinkStream: MediaStreamAudioDestinationNode | null = null
+  private keepAliveEl: HTMLAudioElement | null = null
   private eq: BiquadFilterNode[]
   private echoSend: GainNode
   private dry: GainNode
@@ -215,29 +214,20 @@ export class BoothAudio {
   }
 
   /**
-   * Send the final mix out through a hidden <audio> element instead of straight to the
-   * speaker. Mobile browsers (Firefox on Android) only keep a page playing with the screen
-   * off when a media element is playing; pure Web Audio is suspended. Call `true` from a tap.
+   * Keep the page playing with the screen off (Firefox on Android, PCM path). Android only keeps
+   * a tab alive while Firefox shows a media notification, and Firefox only does that for a media
+   * element that decodes a real source (never a `srcObject` stream), lasts 3 s or more and is
+   * audible. So this loops a generated noise clip through an element; audibility is judged on
+   * the decoded audio, and its output goes into a 0 gain, so nobody hears it. Call `true` from a tap.
    */
-  playThroughElement(on: boolean) {
-    if (on === !!this.sinkEl) {
-      if (on) void this.sinkEl!.play().catch(() => {})
-      return
+  keepAlive(on: boolean) {
+    if (!on) return this.keepAliveEl?.pause()
+    if (!this.keepAliveEl) {
+      const el = (this.keepAliveEl = new Audio(URL.createObjectURL(noiseWav(10))))
+      el.loop = true
+      this.ctx.createMediaElementSource(el).connect(gainNode(this.ctx, 0)).connect(this.ctx.destination)
     }
-    if (on) {
-      this.sinkStream ??= this.ctx.createMediaStreamDestination()
-      const el = (this.sinkEl = new Audio())
-      el.srcObject = this.sinkStream.stream
-      this.master.disconnect()
-      this.master.connect(this.sinkStream)
-      void el.play().catch(() => {})
-    } else {
-      this.sinkEl!.pause()
-      this.sinkEl!.srcObject = null
-      this.sinkEl = null
-      this.master.disconnect()
-      this.master.connect(this.ctx.destination)
-    }
+    void this.keepAliveEl.play().catch(() => {})
   }
 
   /** Seconds between this page's audio and the speaker (for sync). */
@@ -260,7 +250,11 @@ export class BoothAudio {
   }
 
   close() {
-    if (this.sinkEl) this.playThroughElement(false)
+    if (this.keepAliveEl) {
+      this.keepAliveEl.pause()
+      URL.revokeObjectURL(this.keepAliveEl.src)
+      this.keepAliveEl = null
+    }
     this.stopPads()
     this.closeMic()
     void this.ctx.close()
@@ -520,4 +514,18 @@ export class BoothAudio {
   closeMic() {
     this.talk.closeMic()
   }
+}
+
+/** `sec` seconds of white noise as a WAV file (8 kHz mono 16-bit), for the keep-alive element. */
+function noiseWav(sec: number) {
+  const sr = 8000
+  const n = sr * sec
+  const v = new DataView(new ArrayBuffer(44 + n * 2))
+  const str = (o: number, s: string) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)))
+  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE')
+  str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true)
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true)
+  str(36, 'data'); v.setUint32(40, n * 2, true)
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, (Math.random() * 2 - 1) * 3000, true)
+  return new Blob([v.buffer], { type: 'audio/wav' })
 }

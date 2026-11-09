@@ -81,10 +81,10 @@ export const useListening = defineSingleton(() => {
     }
     // MP3 through the <audio> element where the browser can (Chrome); raw PCM scheduled with
     // Web Audio where it can't (Firefox, iPhones). Both play in sync.
-    // The PCM path also plays out through a hidden <audio> element: otherwise Firefox on
-    // Android suspends it when the screen goes off.
+    // The PCM path also runs an inaudible keep-alive media element: otherwise Firefox on
+    // Android suspends the page when the screen goes off (see BoothAudio.keepAlive).
     const mse = lowLatencySupported()
-    audio.playThroughElement(!mse)
+    audio.keepAlive(!mse)
     live = mse
       ? playLive(el, `/api/stream?t=${Date.now()}`, onTrouble, opts)
       : playPcm(audio.ctx, audio.musicIn, `/api/stream?format=pcm&t=${Date.now()}`, onTrouble, opts)
@@ -106,7 +106,7 @@ export const useListening = defineSingleton(() => {
     syncInfo.value = null
     audio?.stopPads()
     audio?.closeMic()
-    audio?.playThroughElement(false)
+    audio?.keepAlive(false)
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none'
   }
 
@@ -122,7 +122,7 @@ export const useListening = defineSingleton(() => {
   function onVisible() {
     if (document.visibilityState !== 'visible' || !listening.value || !audio) return
     void audio.resume()
-    if (!lowLatencySupported()) audio.playThroughElement(true)
+    if (!lowLatencySupported()) audio.keepAlive(true)
   }
 
   /** Leaving the page: stop and release the audio contexts. */
