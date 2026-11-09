@@ -34,8 +34,10 @@ export interface Pad {
   emoji: string
   label: string
   durationSec?: number
-  /** Recorded from the booth mic (can be deleted). */
+  /** Added from the booth (mic or myinstants): can be deleted. */
   recorded?: boolean
+  /** Tile colour (pads added from myinstants). */
+  color?: string
 }
 
 /** Server-sent events on `/api/fx/events`. `from` is the page that caused it. */

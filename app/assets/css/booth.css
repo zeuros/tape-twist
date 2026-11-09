@@ -5,6 +5,9 @@
 .pad { aspect-ratio: 1 / .9; border: 0; border-radius: 18px; background: var(--panel-2); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 6px 4px; touch-action: manipulation; user-select: none; -webkit-user-select: none; transition: transform .06s, border-color .15s, box-shadow .15s; }
 .pad:active { transform: scale(.94); }
 .pad:hover { border-color: transparent; background: color-mix(in srgb, var(--accent) 10%, var(--panel-2)); }
+.pad.tinted { background: color-mix(in srgb, var(--pad-color) 32%, var(--panel-2)); }
+.pad.tinted:not(.live):hover { background: color-mix(in srgb, var(--pad-color) 45%, var(--panel-2)); }
+.pad.tinted .pad-label { color: var(--text); }
 .pad.live { border-color: var(--accent); background: var(--grad); box-shadow: var(--glow), 0 0 26px color-mix(in srgb, var(--accent) 45%, transparent); }
 .pad-emoji { font-size: 28px; line-height: 1; }
 .pad-label { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.15; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -18,6 +21,11 @@
 .rec-name input { width: 100%; min-width: 0; border: 0; border-radius: 999px; padding: 6px 10px; font-size: 13px; text-align: center; background: var(--well); box-shadow: var(--well-shadow); }
 .rec-actions { display: flex; justify-content: center; gap: 6px; }
 .pad.rec { touch-action: none; -webkit-touch-callout: none; }
+.pads-sep { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; margin: 6px 0 2px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.pads-sep::before, .pads-sep::after { content: ''; flex: 1; height: 1px; background: color-mix(in srgb, var(--muted) 30%, transparent); }
+.instant-add { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
+.instant-add input { flex: 1; min-width: 0; border: 0; border-radius: 999px; padding: 8px 14px; font-size: 13px; background: var(--well); box-shadow: var(--well-shadow); color: var(--text); }
+.instant-add button { flex: none; white-space: nowrap; }
 
 /* Hold buttons */
 .holds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }

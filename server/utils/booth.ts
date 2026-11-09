@@ -197,6 +197,47 @@ class Booth {
     return entry
   }
 
+  /** A sound from a myinstants.com page (or its direct .mp3 link): its title, a guessed emoji, a random colour. */
+  async addInstant(link: string) {
+    const page = myinstantsUrl(link)
+    let audioUrl = page
+    let title = ''
+    if (!page.pathname.endsWith('.mp3')) {
+      const html = await (await fetchMyinstants(page, 'text/html')).text()
+      const og = /<meta[^>]+property="og:audio"[^>]+content="([^"]+)"/.exec(html)?.[1] ?? /\/media\/sounds\/[^"'\s]+\.mp3/.exec(html)?.[0]
+      if (!og) throw new Error('No sound on that page')
+      audioUrl = myinstantsUrl(new URL(decodeEntities(og), page).href)
+      title = decodeEntities(/<h1[^>]*id="instant-page-title"[^>]*>([^<]*)/.exec(html)?.[1] ?? /<meta[^>]+property="og:title"[^>]+content="([^"]+)"/.exec(html)?.[1] ?? '')
+    }
+    title = (title.trim() || decodeURIComponent(audioUrl.pathname.split('/').pop()!.replace(/\.mp3$/, '').replace(/_[A-Za-z0-9]{7}$/, ''))).replace(/[-_]+/g, ' ').trim()
+    if (title === title.toUpperCase()) title = title.toLowerCase().replace(/(^|\s)\p{L}/gu, (c) => c.toUpperCase())
+    title = title.charAt(0).toUpperCase() + title.slice(1)
+    const res = await fetchMyinstants(audioUrl, 'audio/mpeg')
+    if (Number(res.headers.get('content-length') || 0) > INSTANT_MAX_BYTES) throw new Error('That sound is too big')
+    const audio = Buffer.from(await res.arrayBuffer())
+    if (audio.length > INSTANT_MAX_BYTES) throw new Error('That sound is too big')
+
+    const id = `mi-${Date.now().toString(36)}`
+    await mkdir(REC_DIR, { recursive: true })
+    const src = join(tmpdir(), `evening-${id}.in`)
+    const out = join(REC_DIR, `${id}.mp3`)
+    try {
+      await writeFile(src, audio, { mode: 0o600 })
+      // Re-encoded: checks it really is audio, and caps it (a pad's length bounds how long it plays).
+      await run('ffmpeg', ['-v', 'error', '-y', '-i', src, '-vn', '-t', String(INSTANT_MAX_SEC), '-c:a', 'libmp3lame', '-b:a', '160k', `${out}.tmp.mp3`])
+      if (!((await probeDuration(`${out}.tmp.mp3`).catch(() => 0)) > 0.05)) throw new Error('That sound is empty')
+      await rename(`${out}.tmp.mp3`, out)
+    } catch (e: any) {
+      throw new Error(e?.message?.startsWith('That') ? e.message : 'Could not read that sound')
+    } finally {
+      await rm(src, { force: true })
+      await rm(`${out}.tmp.mp3`, { force: true })
+    }
+    const entry: PadEntry = { id, emoji: guessEmoji(title), label: title.slice(0, 30) || 'Instant', file: `${id}.mp3`, color: `hsl(${Math.floor(Math.random() * 360)} 70% 50%)` }
+    await this.editRecorded(async (list) => [...list, entry])
+    return entry
+  }
+
   async deleteRecorded(id: string) {
     let found = false
     await this.editRecorded(async (list) => {
@@ -208,6 +249,56 @@ class Booth {
     })
     return found
   }
+}
+
+const INSTANT_MAX_BYTES = 3 * 1024 * 1024
+const INSTANT_MAX_SEC = 15
+
+/** Only myinstants.com is ever fetched (the link comes from a guest's phone). */
+function myinstantsUrl(link: string) {
+  let u: URL
+  try {
+    u = new URL(/^https?:\/\//i.test(link.trim()) ? link.trim() : `https://${link.trim()}`)
+  } catch {
+    throw new Error('That is not a myinstants link')
+  }
+  if (!/^(www\.)?myinstants\.com$/i.test(u.hostname)) throw new Error('That is not a myinstants link')
+  u.protocol = 'https:'
+  u.port = ''
+  u.username = u.password = ''
+  return u
+}
+
+async function fetchMyinstants(url: URL, accept: string) {
+  const res = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0 (evening soundboard)', accept }, signal: AbortSignal.timeout(10_000) }).catch(() => {
+    throw new Error('Could not reach myinstants')
+  })
+  myinstantsUrl(res.url) // followed redirects must stay on myinstants
+  if (!res.ok) throw new Error(res.status === 404 ? 'That instant does not exist' : `myinstants answered ${res.status}`)
+  return res
+}
+
+function decodeEntities(s: string) {
+  return s
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(Number.parseInt(n, 16)))
+    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+}
+
+const EMOJI_WORDS: [RegExp, string][] = [
+  [/boom|explo|bomb/i, '💥'], [/fart|\bpet\b/i, '💨'], [/laugh|lol|haha|rire/i, '😂'], [/bruh|moai/i, '🗿'],
+  [/horn|mlg/i, '📯'], [/bell|ding/i, '🔔'], [/wrong|error|fail|buzzer|\bno+\b/i, '❌'], [/correct|\bwin\b|\byes\b|victory/i, '✅'],
+  [/cricket/i, '🦗'], [/scream|\bcri\b|ahh/i, '😱'], [/sad|violin|cry/i, '😢'], [/drum|rimshot|ba dum/i, '🥁'],
+  [/gun|shot|spas|pew/i, '🔫'], [/punch|\bhit\b|slap/i, '👊'], [/\bcat\b|meow/i, '🐱'], [/dog|bark|woof/i, '🐶'],
+  [/among us|\bsus\b/i, '📮'], [/oof|roblox/i, '🧱'], [/camera|photo/i, '📸'], [/money|cash|apple ?pay/i, '💸'],
+  [/music|song|guitar|piano/i, '🎵'], [/whistle/i, '😗'], [/wow|omg/i, '😮'], [/rizz/i, '😏'], [/dun dun|dramatic/i, '😨'],
+]
+const EMOJI_ANY = ['🎉', '🔊', '⚡', '🎺', '👾', '🦆', '🍕', '🚨', '🌶️', '🎯', '🪩', '🛸']
+
+/** The emoji the title starts or ends with, else one matching a word, else a random one. */
+function guessEmoji(title: string) {
+  const own = /\p{Extended_Pictographic}\uFE0F?/u.exec(title)?.[0]
+  return own ?? EMOJI_WORDS.find(([re]) => re.test(title))?.[1] ?? EMOJI_ANY[Math.floor(Math.random() * EMOJI_ANY.length)]!
 }
 
 async function probeDuration(file: string) {
