@@ -45,3 +45,6 @@ export type BoothEvent =
   | { type: 'stopPads'; from?: string }
   | { type: 'echoOut'; from?: string }
   | { type: 'padsChanged'; from?: string }
+
+/** How far the music ducks under talkover / pads by default (dB). */
+export const DEFAULT_DUCK_DB = 10

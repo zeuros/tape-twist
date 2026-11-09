@@ -1,4 +1,4 @@
-import type { BoothEvent, BoothState, ColorPreset, Eq, Pad, XY } from '#shared/types/booth'
+import { DEFAULT_DUCK_DB, type BoothEvent, type BoothState, type ColorPreset, type Eq, type Pad, type XY } from '#shared/types/booth'
 
 type HoldName = 'talkover' | 'echo' | 'brake'
 
@@ -9,7 +9,7 @@ type HoldName = 'talkover' | 'echo' | 'brake'
  * devices follow within a few ms.
  */
 export const useBooth = defineSingleton(() => {
-  const booth = ref<BoothState>({ eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: 10, padVolume: 0.8, talkover: false, echo: false, brake: false, xy: null, pads: [] })
+  const booth = ref<BoothState>({ eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: DEFAULT_DUCK_DB, padVolume: 0.8, talkover: false, echo: false, brake: false, xy: null, pads: [] })
   const pads = ref<Pad[]>([])
   const fxError = ref('')
   /** Hold buttons pressed here count at once, before the server confirms. */

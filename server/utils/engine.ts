@@ -1,12 +1,9 @@
 import { enforceRouting, ensureSinks } from './audio'
 import { Deck, type DeckState } from './deck'
 import { EQ_MIN, mixer } from './mixer'
-import type { EngineSettings, EngineSnapshot, EngineStatus } from '#shared/types/engine'
+import { DEFAULT_ENGINE_SETTINGS, type EngineSettings, type EngineSnapshot, type EngineStatus } from '#shared/types/engine'
 import type { FavItem } from '#shared/types/music'
 import { activeList, loadEvening, readJson, writeJson } from './store'
-
-/** Deezer plays quieter than SoundCloud: measured on the same songs on both (see README). */
-const DEEZER_BOOST_DB = 11.5
 
 /** Time we allow for loading the next item before its fade must start. */
 const PRELOAD_LEAD = 25 // s before the crossfade; a fresh Deezer page takes a few seconds to open
@@ -43,7 +40,7 @@ class Engine {
   /** Informational message, e.g. why playback was auto-paused. */
   notice = ''
   last: DeckState | null = null
-  settings: EngineSettings = { crossfade: 6, bassSwap: true, deezerBoostDb: DEEZER_BOOST_DB, autoPauseHours: 6, idlePauseMin: 15 }
+  settings: EngineSettings = { ...DEFAULT_ENGINE_SETTINGS }
 
   private get cur() {
     return this.decks[this.active]!
@@ -129,7 +126,7 @@ class Engine {
   }
 
   private trimDb(item: FavItem) {
-    return item.platform === 'deezer' ? this.settings.deezerBoostDb : 0
+    return item.platform === 'deezer' ? this.settings.deezerBoostDb : this.settings.soundcloudLevelDb
   }
 
   private async switchTo(item: FavItem, fade: number) {
@@ -334,6 +331,7 @@ class Engine {
       crossfade: clamp(s.crossfade, 0, 15, cur.crossfade),
       bassSwap: typeof s.bassSwap === 'boolean' ? s.bassSwap : cur.bassSwap,
       deezerBoostDb: clamp(s.deezerBoostDb, 0, 18, cur.deezerBoostDb),
+      soundcloudLevelDb: clamp(s.soundcloudLevelDb, -18, 6, cur.soundcloudLevelDb),
       autoPauseHours: clamp(s.autoPauseHours, 0, 24, cur.autoPauseHours),
       idlePauseMin: clamp(s.idlePauseMin, 0, 240, cur.idlePauseMin),
     }

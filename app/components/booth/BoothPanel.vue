@@ -45,7 +45,6 @@ const num = (e: Event) => Number((e.target as HTMLInputElement).value)
 
     <BoothEq />
 
-    <h3>Transitions & safety</h3>
     <BoothSettings />
   </section>
 </template>

@@ -8,10 +8,24 @@ export interface EngineSettings {
   bassSwap: boolean
   /** Level added to Deezer tracks so they match SoundCloud's (dB). */
   deezerBoostDb: number
+  /** Level applied to SoundCloud tracks (dB, usually negative: leaves headroom so the mix doesn't saturate). */
+  soundcloudLevelDb: number
   /** Pause after this many hours of continuous playback (0 = never). */
   autoPauseHours: number
   /** Pause when nobody has been listening for this many minutes (0 = never). */
   idlePauseMin: number
+}
+
+/** Factory settings (also what "reset" in Transitions & safety goes back to). */
+export const DEFAULT_ENGINE_SETTINGS: EngineSettings = {
+  crossfade: 6,
+  bassSwap: true,
+  // Deezer plays ~12 dB quieter than SoundCloud (see README). Rather than lifting Deezer all the
+  // way (which saturates), SoundCloud comes down 9 dB and Deezer goes up 3 dB.
+  deezerBoostDb: 3,
+  soundcloudLevelDb: -9,
+  autoPauseHours: 6,
+  idlePauseMin: 15,
 }
 
 /** The engine as the player sees it (`GET /api/engine`, and every command's reply). */

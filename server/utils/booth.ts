@@ -3,7 +3,7 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import type { BoothEvent, BoothState, ColorPreset, Pad, XY } from '#shared/types/booth'
+import { DEFAULT_DUCK_DB, type BoothEvent, type BoothState, type ColorPreset, type Pad, type XY } from '#shared/types/booth'
 import { DATA_DIR, readJson, writeJson } from './store'
 
 /**
@@ -33,7 +33,7 @@ type PadEntry = Omit<PadInfo, 'durationSec'>
 type Persisted = Pick<BoothState, 'eq' | 'color' | 'duckDb' | 'padVolume'>
 
 class Booth {
-  private s: Persisted = { eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: 10, padVolume: 0.8 }
+  private s: Persisted = { eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: DEFAULT_DUCK_DB, padVolume: 0.8 }
   private holds = { talkover: 0, echo: 0, brake: 0, xy: 0 }
   private xy: XY | null = null
   private holdTimers: Record<string, ReturnType<typeof setTimeout>> = {}
