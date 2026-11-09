@@ -2,7 +2,7 @@ import type { LiveAudio, SyncInfo } from '~/utils/liveAudio'
 
 /**
  * "Listen here": plays the live mix on this device, in sync with every other listening
- * device (~1.2 s behind the server, app/utils/liveAudio.ts), with the booth effects played
+ * device (~0.4 s behind the server, app/utils/liveAudio.ts), with the booth effects played
  * on top of it (app/utils/boothAudio.ts).
  */
 /** Range of the sync slider, in seconds. */

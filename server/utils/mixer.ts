@@ -44,8 +44,12 @@ const PREFILL = BUF + 2400 // frames queued before the input starts (jitter cove
 const STALL_MS = 2000 // no render callback for this long while capturing: the graph is stuck
 const MAX_QUEUE = BUF + 14400 // past this, skip ahead to PREFILL (clock drift, stalls)
 
-/** How far behind the server every synced phone plays (covers Wi-Fi hiccups). */
-export const SYNC_DELAY = 1.2
+/**
+ * How far behind the server every synced phone plays: also the lag of every seek, pause or
+ * skip. The server side takes 75–155 ms of it (mostly the MP3 encoder), the phone ~50–100 ms
+ * (MSE margin, 0.1 s Web Audio blocks); the rest covers Wi-Fi hiccups.
+ */
+export const SYNC_DELAY = 0.4
 const FRAME_BYTES = 576 // 192 kbit/s, 48 kHz, MPEG-1 layer III: no padding ever
 const FRAME_SAMPLES = 1152
 const BACKLOG_BYTES = 24_000 * 4 // last 4 s of MP3, so a new listener starts in sync at once

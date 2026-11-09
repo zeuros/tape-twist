@@ -18,20 +18,34 @@ function at(ev: PointerEvent) {
 }
 function seekStart(ev: PointerEvent) {
   if (!seekable.value || ev.button > 0) return
+  unsettle()
   capturePointer(ev)
   drag.value = at(ev)
 }
 function seekMove(ev: PointerEvent) {
   if (drag.value !== null) drag.value = at(ev)
 }
+/** After a release, the bar stays where it was dropped until the server reports the new spot. */
+let unsettle = () => {}
 async function seekEnd(ev: PointerEvent) {
   if (drag.value === null) return
   const f = at(ev)
   drag.value = f
-  await command('seek', { value: f * eng.value!.durSec })
-  drag.value = null
+  const target = f * eng.value!.durSec
+  await command('seek', { value: target })
+  if (drag.value !== f) return // grabbed again meanwhile
+  unsettle()
+  const release = () => {
+    unsettle()
+    if (drag.value === f) drag.value = null
+  }
+  const stop = watch(shownPos, (p) => Math.abs(p - target) < 2 && release())
+  const timer = setTimeout(release, 3000) // the server never got there: show what it says
+  unsettle = () => (stop(), clearTimeout(timer), (unsettle = () => {}))
+  if (Math.abs(shownPos.value - target) < 2) release()
 }
 function seekCancel() {
+  unsettle()
   drag.value = null
 }
 </script>

@@ -296,6 +296,8 @@ class Engine {
     return this.run(async () => {
       this.preloaded = null
       await this.cur.seek(sec)
+      // Report the new position right away instead of the last poll's (up to 500 ms old).
+      if (this.last) this.last = { ...this.last, posSec: sec, ended: false }
     })
   }
 
