@@ -32,3 +32,10 @@
   .xfade.ahead small { display: block; }
   .xfade.ahead input { flex: 1; width: auto; min-width: 0; height: 28px; }
 }
+
+/* Touch: no hover, so the position bar is always a bit thicker, with a bigger hit zone and its ring. */
+@media (hover: none) {
+  .progress { height: 34px; margin-bottom: -6px; padding: 0 20px; }
+  .progress.seekable { --track: 7px; --ring: 18px; }
+  .progress.dragging { --track: 9px; --ring: 22px; }
+}

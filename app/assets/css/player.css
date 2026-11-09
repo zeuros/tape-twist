@@ -98,10 +98,19 @@
 
 /* ------------------------------------------- player bar: floating dock */
 .remote { position: fixed; left: 10px; right: 10px; bottom: 10px; z-index: 10; border: 0; border-radius: 24px; overflow: hidden; background: color-mix(in srgb, #202125 88%, transparent); backdrop-filter: blur(14px); box-shadow: 0 20px 50px -10px rgba(0,0,0,.7); }
-.progress { height: 4px; background: #3a3b42; position: relative; }
+/* Position bar: a taller invisible hit zone around a thin track, so it's easy to grab.
+   With a mouse it thickens and shows its ring while the pointer is over the player bar;
+   on touch it's always a bit thicker, ring shown (see responsive.css). */
+/* The zone must be taller than the ring plus its 3px halo: .remote clips what sticks out. */
+.progress { --track: 4px; --ring: 0px; height: 24px; margin-bottom: -8px; padding: 0 22px; display: flex; align-items: center; touch-action: none; user-select: none; }
 .progress.seekable { cursor: pointer; }
-.progress.seekable:hover { height: 8px; margin-top: -4px; }
-.progress span { position: absolute; inset: 0 auto 0 0; background: var(--grad); transition: width .2s linear; }
+.progress-track { position: relative; flex: 1; height: var(--track); border-radius: 99px; background: #3a3b42; transition: height .15s; }
+.progress-fill { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--grad); transition: width .2s linear; }
+.progress-ring { position: absolute; top: 50%; width: var(--ring); height: var(--ring); border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent), 0 1px 4px rgba(0,0,0,.5); transform: translate(-50%, -50%); transition: width .15s, height .15s, left .2s linear; pointer-events: none; }
+.progress.dragging .progress-fill, .progress.dragging .progress-ring { transition: none; }
+@media (hover: hover) {
+  .remote:hover .progress.seekable, .progress.dragging { --track: 7px; --ring: 14px; }
+}
 .remote-row { max-width: 1280px; margin: 0 auto; padding: 10px 16px; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 14px; }
 .now { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .now img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; flex: none; }

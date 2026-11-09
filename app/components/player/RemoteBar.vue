@@ -6,11 +6,33 @@ const { listening, audioState, lag, ahead, syncLabel, setAhead, autoSync } = lis
 const { evening } = useEvening()
 const num = (e: Event) => Number((e.target as HTMLInputElement).value)
 
-function onSeek(ev: MouseEvent) {
-  const e = eng.value
-  if (!e?.durSec) return
-  const r = (ev.currentTarget as HTMLElement).getBoundingClientRect()
-  command('seek', { value: ((ev.clientX - r.left) / r.width) * e.durSec })
+/** Where the bar is being dragged to (0–1), or null when not dragging: the bar follows it, the seek happens on release. */
+const drag = ref<number | null>(null)
+const track = ref<HTMLElement>()
+const seekable = computed(() => !!(eng.value?.current && eng.value.durSec))
+const fraction = computed(() => drag.value ?? (eng.value?.durSec ? Math.min(1, shownPos.value / eng.value.durSec) : 0))
+
+function at(ev: PointerEvent) {
+  const r = track.value!.getBoundingClientRect()
+  return Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width))
+}
+function seekStart(ev: PointerEvent) {
+  if (!seekable.value || ev.button > 0) return
+  capturePointer(ev)
+  drag.value = at(ev)
+}
+function seekMove(ev: PointerEvent) {
+  if (drag.value !== null) drag.value = at(ev)
+}
+async function seekEnd(ev: PointerEvent) {
+  if (drag.value === null) return
+  const f = at(ev)
+  drag.value = f
+  await command('seek', { value: f * eng.value!.durSec })
+  drag.value = null
+}
+function seekCancel() {
+  drag.value = null
 }
 </script>
 
@@ -25,14 +47,20 @@ function onSeek(ev: MouseEvent) {
     />
     <div
       class="progress"
-      :class="{ seekable: eng?.current && eng.durSec }"
+      :class="{ seekable, dragging: drag !== null }"
       role="slider"
       aria-label="Position"
-      :aria-valuenow="Math.round(shownPos)"
+      :aria-valuenow="Math.round(fraction * (eng?.durSec || 0))"
       :aria-valuemax="Math.round(eng?.durSec || 0)"
-      @click="onSeek"
+      @pointerdown="seekStart"
+      @pointermove="seekMove"
+      @pointerup="seekEnd"
+      @pointercancel="seekCancel"
     >
-      <span :style="{ width: `${eng?.durSec ? (shownPos / eng.durSec) * 100 : 0}%` }" />
+      <div ref="track" class="progress-track">
+        <span class="progress-fill" :style="{ width: `${fraction * 100}%` }" />
+        <i v-if="seekable" class="progress-ring" :style="{ left: `${fraction * 100}%` }" />
+      </div>
     </div>
     <div class="remote-row">
       <div class="now">
