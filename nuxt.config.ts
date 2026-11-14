@@ -1,5 +1,5 @@
 // The end-to-end tests build into their own folders, so they never touch a running server's build.
-const e2e = process.env.EVENING_E2E === '1'
+const e2e = process.env.TAPE_TWIST_E2E === '1'
 
 export default defineNuxtConfig({
   compatibilityDate: '2026-11-01',
@@ -9,13 +9,14 @@ export default defineNuxtConfig({
   css: ['~/assets/css/base.css', '~/assets/css/player.css', '~/assets/css/booth.css', '~/assets/css/responsive.css', '~/assets/css/guest.css'],
   app: {
     head: {
-      title: 'Evening Mix',
+      title: 'Tape Twist',
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'theme-color', content: '#14111a' },
       ],
       link: [
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+        { rel: 'icon', href: '/favicon.ico', sizes: '48x48' },
         { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
       ],
     },

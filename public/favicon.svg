@@ -1,9 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <mask id="crescent">
-      <rect width="64" height="64" fill="#fff"/>
-      <circle cx="19" cy="22" r="23" fill="#000"/>
-    </mask>
-  </defs>
-  <circle cx="31" cy="32" r="28" fill="#f0a868" mask="url(#crescent)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6.3 -18.7 84 84">
+  <rect x="-6.3" y="-18.7" width="84" height="84" rx="18" fill="#000"/>
+  <g fill="#f7f7f7">
+    <rect x="29" y="13.75" width="13.4" height="2.5"/>
+    <g id="reel" transform="translate(15 15)">
+      <circle r="11.75" fill="none" stroke="#f7f7f7" stroke-width="6.5"/>
+      <rect x="-1.25" y="-8.8" width="2.5" height="2.9" rx=".3"/>
+      <rect x="-1.25" y="-8.8" width="2.5" height="2.9" rx=".3" transform="rotate(60)"/>
+      <rect x="-1.25" y="-8.8" width="2.5" height="2.9" rx=".3" transform="rotate(120)"/>
+      <rect x="-1.25" y="-8.8" width="2.5" height="2.9" rx=".3" transform="rotate(180)"/>
+      <rect x="-1.25" y="-8.8" width="2.5" height="2.9" rx=".3" transform="rotate(240)"/>
+      <rect x="-1.25" y="-8.8" width="2.5" height="2.9" rx=".3" transform="rotate(300)"/>
+    </g>
+    <use href="#reel" x="41.4"/>
+  </g>
+  <polygon points="28.6,31.1 42.8,31.1 35.7,40.7" fill="#ff7385" stroke="#ff7385" stroke-width="1.6" stroke-linejoin="round"/>
 </svg>

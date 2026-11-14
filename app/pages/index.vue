@@ -90,13 +90,13 @@ onBeforeUnmount(() => {
   clearInterval(tickTimer)
 })
 
-useHead({ title: 'Evening Mix · Requests' })
+useHead({ title: 'Tape Twist · Requests' })
 </script>
 
 <template>
   <div class="guest">
     <header class="g-top">
-      <div class="brand"><span class="moon" aria-hidden="true" /> {{ state?.title || 'Evening Mix' }}</div>
+      <div class="brand"><BrandLogo :spinning="state?.now?.status === 'playing'" /> {{ state?.title || 'Tape Twist' }}</div>
     </header>
 
     <section class="now-card" :class="{ idle: !state?.now }">

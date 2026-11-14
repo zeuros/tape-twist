@@ -1,13 +1,14 @@
 <script setup lang="ts">
 /** Brand, and the SoundCloud / Deezer connections. */
 const { status, loginOpen, platformState, connect } = usePlatforms()
+const { eng } = useEngine()
 </script>
 
 <template>
   <header class="top">
     <div class="brand">
-      <span class="moon" aria-hidden="true" />
-      <span>Evening Mix</span>
+      <BrandLogo :spinning="eng?.status === 'playing'" />
+      <span>Tape Twist</span>
     </div>
     <div class="conns">
       <div v-for="p in PLATFORMS" :key="p" class="conn" :class="[p, platformState(p).tone]">
