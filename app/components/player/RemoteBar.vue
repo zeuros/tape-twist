@@ -133,7 +133,7 @@ function seekCancel() {
           class="xfade ahead"
           title="Play this device earlier, to catch up with the others when its speaker adds delay (Bluetooth: often 100–300 ms). Drag until the speakers sound as one."
         >
-          <span>{{ ahead > 0 ? 'Ahead' : ahead < 0 ? 'Behind' : 'Sync' }} {{ Math.round(Math.abs(ahead) * 1000) }} ms<small v-if="autoSync.note"> · {{ autoSync.note }}</small><small v-else-if="syncLabel"> · {{ syncLabel }}</small></span>
+          <span>{{ ahead > 0 ? 'Ahead' : ahead < 0 ? 'Behind' : 'Sync' }} {{ Math.round(Math.abs(ahead) * 1000) }} ms</span>
           <input type="range" :min="AHEAD_MIN" :max="AHEAD_MAX" step="0.005" :value="ahead" :disabled="autoSync.busy" @input="setAhead(num($event))" @dblclick="setAhead(0)">
           <button
             class="ghost auto-sync"
@@ -143,6 +143,7 @@ function seekCancel() {
           >
             <i v-if="autoSync.busy" class="spin" /><template v-else>🎯 Auto</template>
           </button>
+          <small v-if="autoSync.note || syncLabel" class="sync-note">{{ autoSync.note || syncLabel }}</small>
         </label>
       </div>
     </div>

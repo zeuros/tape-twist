@@ -154,3 +154,6 @@
 .qr-url { margin: 0; font-size: 14px; color: #555; word-break: break-all; }
 .qr-close { color: var(--muted); font-size: 13px; }
 .xfade .auto-sync { padding: 4px 10px; font-size: 12px; min-width: 4.5em; }
+/* The sync note (a failed auto-sync, the sync source) gets its own line, leaving the slider its width */
+.xfade.ahead { flex-wrap: wrap; }
+.xfade .sync-note { flex-basis: 100%; white-space: normal; }
