@@ -48,17 +48,15 @@ const MAX_QUEUE = BUF + 14400 // past this, skip ahead to PREFILL (clock drift, 
 /**
  * How far behind the server every synced phone plays: also the lag of every seek, pause or
  * skip. The server side takes 75–155 ms of it (mostly the MP3 encoder), the phone ~50–100 ms
- * (MSE margin, 0.1 s Web Audio blocks); the rest covers Wi-Fi and 4G hiccups (0.4 crackled
+ * (MP3 decoding, 0.1 s Web Audio blocks); the rest covers Wi-Fi and 4G hiccups (0.4 crackled
  * over 4G).
  */
 export const SYNC_DELAY = 0.45
 const FRAME_BYTES = 576 // 192 kbit/s, 48 kHz, MPEG-1 layer III: no padding ever
 const FRAME_SAMPLES = 1152
 const BACKLOG_BYTES = 24_000 * 4 // last 4 s of MP3, so a new listener starts in sync at once
-const PCM_BACKLOG_BLOCKS = Math.ceil((3 * SR) / BUF) // 3 s of raw audio for a new PCM listener
 // A listener this far behind (8 s) is dropped; it reconnects.
-const MAX_PENDING = { mp3: 24_000 * 8, pcm: SR * 4 * 8 }
-type StreamKind = 'mp3' | 'pcm'
+const MAX_PENDING = 24_000 * 8
 const ANCHOR_WINDOW = 120 // callbacks (~5 s) over which the earliest timing wins
 
 /** Server clock in ms, sub-millisecond (what /api/clock reports). */
@@ -115,7 +113,7 @@ class Mixer {
   private graph: Graph | null = null
   private capture: ChildProcess | null = null
   private encoder: ChildProcess | null = null
-  private listeners = new Map<PassThrough, StreamKind>()
+  private listeners = new Set<PassThrough>()
   private stopTimer: ReturnType<typeof setTimeout> | undefined
   private rest = Buffer.alloc(0)
   // Sync timeline (reset when the encoder restarts; `epoch` tells the phones).
@@ -123,7 +121,6 @@ class Mixer {
   private samples = 0
   private bytesOut = 0
   private backlog: Buffer[] = []
-  private pcmBacklog: { start: number; data: Buffer }[] = []
   private backlogStart = 0
   private anchors: number[] = []
   private anchorMs: number | null = null
@@ -278,7 +275,6 @@ class Mixer {
     this.samples = this.bytesOut = this.backlogStart = 0
     this.tempo.reset()
     this.backlog = []
-    this.pcmBacklog = []
     this.anchors = []
     this.anchorMs = null
     const capture = spawn('ffmpeg', [
@@ -340,7 +336,7 @@ class Mixer {
     this.teardown(abandon)
     // Unexpected exit: the timeline restarts, so close the streams; the phones reconnect
     // (after 2 s), which starts everything again with a new epoch.
-    for (const l of this.listeners.keys()) l.destroy()
+    for (const l of this.listeners) l.destroy()
   }
 
   private stop() {
@@ -407,14 +403,6 @@ class Mixer {
     stdin.write(Buffer.from(out.buffer))
     if (this.tempo.push(L, R)) for (const fn of this.tempoSubs) fn(this.tempo.bpm)
 
-    // Same audio as raw 16-bit PCM, for browsers that can't stream MP3 (Firefox, iPhones).
-    const i16 = new Int16Array(n * 2) // little-endian on every machine this runs on
-    for (let i = 0; i < n * 2; i++) i16[i] = Math.max(-1, Math.min(1, out[i]!)) * 32767
-    const pcm = Buffer.from(i16.buffer)
-    this.pcmBacklog.push({ start: this.samples, data: pcm })
-    if (this.pcmBacklog.length > PCM_BACKLOG_BLOCKS) this.pcmBacklog.shift()
-    this.send('pcm', pcm)
-
     // Timing: these samples were rendered by now. Late callbacks only look later, so the
     // earliest estimate over a few seconds is the true anchor.
     this.samples += n
@@ -429,14 +417,9 @@ class Mixer {
     while (this.backlog.length > 1 && this.bytesOut - this.backlogStart - this.backlog[0]!.length >= BACKLOG_BYTES) {
       this.backlogStart += this.backlog.shift()!.length
     }
-    this.send('mp3', chunk)
-  }
-
-  private send(kind: StreamKind, chunk: Buffer) {
-    for (const [l, k] of this.listeners) {
-      if (k !== kind) continue
+    for (const l of this.listeners) {
       // Never drop bytes (it would shift that phone's timeline): a stuck client is closed.
-      if (l.writableLength > MAX_PENDING[kind]) l.destroy()
+      if (l.writableLength > MAX_PENDING) l.destroy()
       else l.write(chunk)
     }
   }
@@ -446,28 +429,19 @@ class Mixer {
     return { now: nowMs(), anchor: this.anchorMs, epoch: this.epoch, sr: SR, delay: SYNC_DELAY }
   }
 
-  /**
-   * A new listening stream, starting a few seconds back: MP3 (on a frame boundary), or raw
-   * PCM (s16le stereo 48 kHz) for browsers that can't stream MP3.
-   */
-  addListener(kind: StreamKind = 'mp3'): { out: PassThrough; startSample: number; epoch: number } {
+  /** A new listening stream (MP3), starting a few seconds back on a frame boundary. */
+  addListener(): { out: PassThrough; startSample: number; epoch: number } {
     clearTimeout(this.stopTimer)
     this.start()
-    const out = new PassThrough({ highWaterMark: MAX_PENDING[kind] * 2 })
-    let startSample: number
-    if (kind === 'pcm') {
-      startSample = this.pcmBacklog[0]?.start ?? this.samples
-      for (const b of this.pcmBacklog) out.write(b.data)
-    } else {
-      const startByte = Math.ceil(Math.max(this.backlogStart, this.bytesOut - BACKLOG_BYTES) / FRAME_BYTES) * FRAME_BYTES
-      let pos = this.backlogStart
-      for (const c of this.backlog) {
-        if (pos + c.length > startByte) out.write(c.subarray(Math.max(0, startByte - pos)))
-        pos += c.length
-      }
-      startSample = (startByte / FRAME_BYTES) * FRAME_SAMPLES
+    const out = new PassThrough({ highWaterMark: MAX_PENDING * 2 })
+    const startByte = Math.ceil(Math.max(this.backlogStart, this.bytesOut - BACKLOG_BYTES) / FRAME_BYTES) * FRAME_BYTES
+    let pos = this.backlogStart
+    for (const c of this.backlog) {
+      if (pos + c.length > startByte) out.write(c.subarray(Math.max(0, startByte - pos)))
+      pos += c.length
     }
-    this.listeners.set(out, kind)
+    const startSample = (startByte / FRAME_BYTES) * FRAME_SAMPLES
+    this.listeners.add(out)
     const done = () => {
       if (!this.listeners.delete(out)) return
       if (!this.listeners.size) {

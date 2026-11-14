@@ -52,13 +52,6 @@ function seekCancel() {
 
 <template>
   <footer class="remote">
-    <audio
-      :ref="listen.setElement"
-      preload="none"
-      @playing="audioState = 'on'"
-      @error="listen.onTrouble"
-      @ended="listen.onTrouble"
-    />
     <div
       class="progress"
       :class="{ seekable, dragging: drag !== null }"

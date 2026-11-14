@@ -1,12 +1,10 @@
 /**
- * Turns the live stream's bytes into blocks of stereo samples, each numbered by the stream
+ * Turns the live MP3 stream's bytes into blocks of stereo samples, each numbered by the stream
  * sample of its first frame (the sync timeline, see server/utils/mixer.ts).
  *
- * Two wire formats:
- * - MP3 (what every device gets now): CBR 192k at 48 kHz, so every frame is exactly 576 bytes
- *   and 1152 samples. Frames are decoded one by one (mpg123, WebAssembly), and a frame that
- *   fails to decode still counts 1152 samples (silence), so the timeline never shifts.
- * - raw s16le stereo (the fallback when WebAssembly is unavailable).
+ * The MP3 is CBR 192k at 48 kHz, so every frame is exactly 576 bytes and 1152 samples. Frames
+ * are decoded one by one (mpg123, WebAssembly), and a frame that fails to decode still counts
+ * 1152 samples (silence), so the timeline never shifts.
  */
 
 /** Frames per scheduled block (0.1 s at 48 kHz). */
@@ -69,27 +67,6 @@ function framer(size: number) {
     let off = 0
     for (; off + size <= data.length; off += size) each(data.subarray(off, off + size))
     rest = data.slice(off)
-  }
-}
-
-/** Raw s16le stereo, starting at stream sample `start`. */
-export function pcmReader(start: number) {
-  const blocker = new Blocker(start)
-  const frame = framer(4 * 480) // 10 ms at a time
-  return (chunk: Uint8Array): RawBlock[] => {
-    const out: RawBlock[] = []
-    frame(chunk, (unit) => {
-      const pcm = new Int16Array(unit.slice().buffer)
-      const n = pcm.length >> 1
-      const l = new Float32Array(n)
-      const r = new Float32Array(n)
-      for (let i = 0; i < n; i++) {
-        l[i] = pcm[2 * i]! / 32768
-        r[i] = pcm[2 * i + 1]! / 32768
-      }
-      blocker.push(l, r, out)
-    })
-    return out
   }
 }
 

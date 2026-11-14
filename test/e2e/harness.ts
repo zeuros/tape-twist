@@ -164,7 +164,7 @@ export function jitterProxy(target: number, port: number, spikeMs = 220, seed = 
 /**
  * Runs in every page before the app. It taps each audio context's output (an analyser on
  * whatever connects to `destination`) and every 25 ms notes its level, so a test can read:
- *  - `__e2e.level(i, ms)`: the lowest and highest level of context i (0 = music, 1 = pads/voice)
+ *  - `__e2e.level(i, ms)`: the lowest and highest level of open context i (0 = music, 1 = pads/voice)
  *    over the last `ms` (the 25 ms readings);
  *  - `__e2e.gaps(i, sinceMs, floor)`: how often context i dropped below `floor` since then;
  *  - `__e2e.errors`: uncaught errors and rejections.
@@ -195,14 +195,8 @@ export const INSTRUMENT = () => {
     }
     return connect.call(this, dest, ...rest)
   } as any
-  // The stream's <audio> element: its media time, or -1 while paused (MSE phones; Chromium
-  // feeds a Web Audio graph silence from an MSE element in this setup, so its level can't tell).
-  const media: [number, number][] = []
   setInterval(() => {
     const now = performance.now()
-    const el = document.querySelector<HTMLAudioElement>('footer.remote audio')
-    media.push([now, el && !el.paused && el.src ? el.currentTime : -1])
-    while (media.length && media[0]![0] < now - 120_000) media.shift()
     for (const t of taps) {
       t.an.getFloatTimeDomainData(t.buf as Float32Array<ArrayBuffer>)
       let sum = 0
@@ -212,49 +206,20 @@ export const INSTRUMENT = () => {
       while (t.log.length && t.log[0]![0] < now - 120_000) t.log.shift()
     }
   }, 25)
-  const since = (i: number, ms: number) => (taps[i]?.log ?? []).filter(([t]) => t >= performance.now() - ms).map(([, v]) => v)
+  // Contexts still open, in creation order: Listen pressed by hand replaces them.
+  const live = () => taps.filter((t) => t.ctx.state !== 'closed')
+  const since = (i: number, ms: number) => (live()[i]?.log ?? []).filter(([t]) => t >= performance.now() - ms).map(([, v]) => v)
   w.__e2e = {
     errors,
     taps,
-    contexts: () => taps.map((t) => t.ctx.state),
+    contexts: () => live().map((t) => t.ctx.state),
     level(i: number, ms = 300) {
       const v = since(i, ms)
       return v.length ? { min: Math.min(...v), max: Math.max(...v), n: v.length } : null
     },
-    /** How fast the element's media time moved over the last `ms` (1: playing; 0: stopped). */
-    progress(ms = 1000) {
-      const m = media.filter(([t]) => t >= performance.now() - ms)
-      if (m.length < 2) return 0
-      let played = 0
-      for (let i = 1; i < m.length; i++) if (m[i]![1] >= 0 && m[i - 1]![1] >= 0) played += Math.max(0, Math.min(0.1, m[i]![1] - m[i - 1]![1]))
-      return played / ((m.at(-1)![0] - m[0]![0]) / 1000)
-    },
-    /**
-     * Glitches of the element over the last `ms`: freezes (paused or not moving for ≥ `minMs`,
-     * as offset/length ms) and jumps (media time leaping ≥ 50 ms: a seek, heard as a skip).
-     */
-    glitches(ms: number, minMs = 100) {
-      const m = media.filter(([t]) => t >= performance.now() - ms)
-      const freezes: [number, number][] = []
-      let jumps = 0
-      let start: number | null = null
-      for (let i = 1; i < m.length; i++) {
-        const dt = (m[i]![0] - m[i - 1]![0]) / 1000
-        const dm = m[i]![1] - m[i - 1]![1]
-        const frozen = m[i]![1] < 0 || m[i - 1]![1] < 0 || dm < dt * 0.3
-        if (!frozen && Math.abs(dm - dt) > 0.05) jumps++
-        if (frozen) start ??= m[i - 1]![0]
-        else if (start != null) {
-          if (m[i - 1]![0] - start >= minMs) freezes.push([Math.round(start - m[0]![0]), Math.round(m[i - 1]![0] - start)])
-          start = null
-        }
-      }
-      if (start != null && m.at(-1)![0] - start >= minMs) freezes.push([Math.round(start - m[0]![0]), Math.round(m.at(-1)![0] - start)])
-      return { freezes, jumps }
-    },
     /** Readings below `floor` in the last `ms`, as runs (start offset ms, length ms). */
     gaps(i: number, ms: number, floor: number) {
-      const log = (taps[i]?.log ?? []).filter(([t]) => t >= performance.now() - ms)
+      const log = (live()[i]?.log ?? []).filter(([t]) => t >= performance.now() - ms)
       const runs: [number, number][] = []
       let start: number | null = null
       for (const [t, v] of log) {

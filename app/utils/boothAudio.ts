@@ -5,7 +5,7 @@
  *    what changes it — echo, EQ, colour, duck (these respond within ~60 ms);
  *  - fx context (lowest latency): pads and the mic voice, added on top (instant).
  *
- *   <audio> ─▶ brake ─▶ rewind ─▶ stutter ─┬──────────────────────────────┬─▶ EQ ─▶ XY filter ─▶ build-up high-pass ─┐
+ *   stream ─▶ brake ─▶ rewind ─▶ stutter ─┬──────────────────────────────┬─▶ EQ ─▶ XY filter ─▶ build-up high-pass ─┐
  *    (tape-stop  (reverse   (looping       └─ echo send ─▶ ping-pong delay ┘                                          │
  *     delay)      delay)     delay)                                                                                    │
  *     ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -117,17 +117,15 @@ export class BoothAudio {
   private echoHeld = false
 
   /**
-   * Call from a tap (browsers only start audio after a user gesture). `el` is the <audio> element
-   * of the MP3 path; none on the PCM path (blocks go into `musicIn`), so that one can be thrown
-   * away and rebuilt (an element can only ever be connected to one context).
+   * Call from a tap (browsers only start audio after a user gesture). The stream's decoded
+   * blocks are scheduled into `musicIn` (app/utils/liveAudio.ts).
    */
-  constructor(el: HTMLAudioElement | null) {
+  constructor() {
     const ctx = (this.ctx = new AudioContext({ latencyHint: MUSIC_LATENCY }))
     const fx = (this.fx = new AudioContext({ latencyHint: 'interactive' }))
     const gain = (v = 1, c: BaseAudioContext = ctx) => gainNode(c, v)
-    // The music comes in here: from the element (MP3 stream), or as scheduled PCM blocks.
+    // The music comes in here, as scheduled blocks of the decoded stream.
     const src = (this.musicIn = gain())
-    if (el) ctx.createMediaElementSource(el).connect(src)
 
     // Tape stop: a delay whose length grows ever faster slows the music down to a standstill
     // (and lowers its pitch with it); shrinking it back to 0 plays catch-up, then it's live again.
@@ -260,8 +258,8 @@ export class BoothAudio {
   }
 
   /**
-   * Keep the page playing with the screen off (Firefox on Android, PCM path). Android only keeps
-   * a tab alive while Firefox shows a media notification, and Firefox only does that for a media
+   * Keep the page playing with the screen off, and the lock-screen controls up. Android only keeps
+   * a tab alive while the browser shows a media notification, and it only does that for a media
    * element that decodes a real source (never a `srcObject` stream), lasts 3 s or more and is
    * audible. So this loops a generated noise clip through an element; audibility is judged on
    * the decoded audio, and its output goes into a 0 gain, so nobody hears it. Call `true` from a tap.

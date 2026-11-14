@@ -16,14 +16,11 @@ export const useListening = defineSingleton(() => {
   const syncInfo = ref<SyncInfo | null>(null)
   /** Seconds this device plays early, for a speaker with its own delay (Bluetooth). */
   const ahead = ref(Number(readPref('ahead') ?? 0))
-  let el: HTMLAudioElement | null = null
   let live: LiveAudio | null = null
   let audio: BoothAudio | null = null
   let lagTimer: ReturnType<typeof setInterval> | undefined
   let retryTimer: ReturnType<typeof setTimeout> | undefined
 
-  /** The page's <audio> element (a template ref). */
-  const setElement = (e: unknown) => (el = e as HTMLAudioElement | null)
   /** This device's booth audio, once it has listened (null before). */
   const getAudio = () => audio
 
@@ -62,27 +59,25 @@ export const useListening = defineSingleton(() => {
   const syncLabel = computed(() => {
     if (!listening.value) return ''
     const s = syncInfo.value
-    if (!s) return lag.value == null ? 'not synced (this browser can\'t)' : 'syncing…'
+    if (!s) return 'syncing…'
     return `in sync ±${Math.max(1, Math.round(Math.abs(s.errorMs) + s.rttMs / 2))} ms`
   })
 
   let rebuild = false // the audio context broke: make a new one on the next start
   /**
-   * `fromTap`: pressed by hand. On the PCM path (Firefox, iPhones) that also rebuilds the audio
-   * contexts, like a page refresh would: one can break for good (no sound while "listening").
+   * `fromTap`: pressed by hand. That also rebuilds the audio contexts, like a page refresh
+   * would: one can break for good (no sound while "listening").
    */
   function start(fromTap = false) {
-    if (!el) return
-    const mse = lowLatencySupported()
     live?.stop()
     live = null
-    if (audio && !mse && (fromTap || rebuild)) {
+    if (audio && (fromTap || rebuild)) {
       audio.close()
       audio = null
     }
     rebuild = false
     if (!audio) {
-      audio = new BoothAudio(mse ? el : null) // inside the tap: browsers only start audio after a gesture
+      audio = new BoothAudio() // inside the tap: browsers only start audio after a gesture
       useBooth().attach(audio)
     }
     void audio.resume()
@@ -90,24 +85,19 @@ export const useListening = defineSingleton(() => {
     audioState.value = 'connecting'
     const opts = {
       ahead: () => ahead.value,
-      outputLatency: () => audio?.outputLatency() ?? 0,
       onPlaying: () => (audioState.value = 'on'),
     }
-    // MP3 through the <audio> element where the browser can (Chrome); raw PCM scheduled with
-    // Web Audio where it can't (Firefox, iPhones). Both play in sync.
-    // The PCM path also runs an inaudible keep-alive media element: otherwise Firefox on
-    // Android suspends the page when the screen goes off (see BoothAudio.keepAlive).
-    audio.keepAlive(!mse)
-    live = mse
-      ? playLive(el, `/api/stream?t=${Date.now()}`, onTrouble, opts)
-      : playPcm(audio.ctx, audio.musicIn, `/api/stream?t=${Date.now()}`, onTrouble, opts)
+    // An inaudible keep-alive media element: otherwise Android suspends the page when the
+    // screen goes off, and shows no lock-screen controls (see BoothAudio.keepAlive).
+    audio.keepAlive(true)
+    live = playLive(audio.ctx, audio.musicIn, `/api/stream?t=${Date.now()}`, onTrouble, opts)
     nativePlaying(true)
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'
     clearInterval(lagTimer)
     lagTimer = setInterval(() => {
       lag.value = live?.lag() ?? null
       syncInfo.value = live?.sync() ?? null
-      detail.value = live?.detail?.() ?? ''
+      detail.value = live?.detail() ?? ''
     }, 1000)
   }
 
@@ -128,7 +118,7 @@ export const useListening = defineSingleton(() => {
   }
 
   /** The stream broke (network, server restart), or the audio context did: reconnect in 2 s. */
-  function onTrouble(why?: Trouble | Event) {
+  function onTrouble(why?: Trouble) {
     if (!listening.value) return
     if (why === 'dead') rebuild = true
     audioState.value = 'connecting'
@@ -140,7 +130,7 @@ export const useListening = defineSingleton(() => {
   function onVisible() {
     if (document.visibilityState !== 'visible' || !listening.value || !audio) return
     void audio.resume()
-    if (!lowLatencySupported()) audio.keepAlive(true)
+    audio.keepAlive(true)
   }
 
   /** Leaving the page: stop and release the audio contexts. */
@@ -150,5 +140,5 @@ export const useListening = defineSingleton(() => {
     audio = null
   }
 
-  return { listening, audioState, lag, ahead, setAhead, autoSync, runAutoSync, syncLabel, syncTitle, setElement, getAudio, start, stop, onTrouble, onVisible, close }
+  return { listening, audioState, lag, ahead, setAhead, autoSync, runAutoSync, syncLabel, syncTitle, getAudio, start, stop, onTrouble, onVisible, close }
 })

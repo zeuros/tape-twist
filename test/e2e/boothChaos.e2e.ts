@@ -5,11 +5,10 @@
  *  - every phone still plays the music, at its normal level, without dropouts (also the
  *    one on a jittery 4G-like link);
  *  - a pad hit on any phone plays on every phone, also a pad added during the evening;
- *  - the light show shows on the phones listening when it's switched on (the one that
- *    switched it on too), and not on a phone that starts listening later.
+ *  - the light show shows on every listening phone while Lights is held (the holder's too).
  *
- * Phones: Chrome (MP3 through MSE), Chrome without MP3 in MSE (the iPhone path: MP3 decoded
- * in the page, Web Audio blocks), Firefox, and Chrome behind a 4G-like link.
+ * Phones (each decodes the MP3 in the page and schedules Web Audio blocks): two Chromes,
+ * Firefox, and Chrome behind a 4G-like link.
  *
  *   npm run test:e2e            (E2E_CHAOS_SEC=20 for a shorter run)
  */
@@ -29,9 +28,7 @@ const FX = 1
 interface Phone {
   name: string
   page: Page
-  /** Plays the MP3 through Media Source Extensions (else: decoded in the page, Web Audio blocks). */
-  mse: boolean
-  /** Music level before anything happened (Web Audio phones). */
+  /** Music level before anything happened. */
   baseline: number
   streams: number
   errors: string[]
@@ -48,18 +45,15 @@ const phones: Phone[] = []
 let seed = Number(process.env.E2E_SEED || Date.now() % 100000)
 const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)
 
-async function openPhone(name: string, browser: Browser, base: string, opts: { pcm?: boolean } = {}): Promise<Phone> {
+async function openPhone(name: string, browser: Browser, base: string): Promise<Phone> {
   const ctx = await browser.newContext({ viewport: { width: 420, height: 1500 } })
   if (browser.browserType().name() === 'chromium') await ctx.grantPermissions(['microphone'], { origin: base })
   await ctx.addInitScript(INSTRUMENT)
-  // The iPhone path: no MP3 in Media Source Extensions.
-  if (opts.pcm) await ctx.addInitScript(() => (MediaSource.isTypeSupported = () => false))
   const page = await ctx.newPage()
-  const phone: Phone = { name, page, mse: false, baseline: 0, streams: 0, errors: [] }
+  const phone: Phone = { name, page, baseline: 0, streams: 0, errors: [] }
   page.on('request', (r) => r.url().includes('/api/stream') && phone.streams++)
   page.on('pageerror', (e) => phone.errors.push(`pageerror: ${e.message}`))
   await openPlayer(page, base)
-  phone.mse = await page.evaluate(() => typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported('audio/mpeg'))
   return phone
 }
 
@@ -79,22 +73,14 @@ const level = (p: Phone, ctx: number, ms: number) =>
 const gaps = (p: Phone, ctx: number, ms: number, floor: number) =>
   p.page.evaluate(([c, m, f]) => (window as any).__e2e.gaps(c, m, f), [ctx, ms, floor] as const) as Promise<[number, number][]>
 
-/**
- * How much of its normal music a phone plays over the last `ms`: 1 = all of it, 0 = silence.
- * Web Audio phones: their lowest level against the one before the test. MSE phones: how fast
- * the element plays (Chromium hands Web Audio silence from an MSE element in this setup);
- * their Web Audio graph is the same as the other phones', which hear it.
- */
+/** How much of its normal music a phone plays over the last `ms`: its lowest level against the one before the test (1 = all of it, 0 = silence). */
 async function music(p: Phone, ms: number) {
-  if (p.mse) return p.page.evaluate((m) => (window as any).__e2e.progress(m) as number, ms)
   return ((await level(p, MUSIC, ms))?.min ?? 0) / p.baseline
 }
 
-/** Dropouts over the last `ms`: music below 30 % for ≥ 50 ms, or (MSE) the element freezing or skipping. */
+/** Dropouts over the last `ms`: music below 30 % for ≥ 50 ms. */
 async function dropouts(p: Phone, ms: number) {
-  if (!p.mse) return (await gaps(p, MUSIC, ms, p.baseline * 0.3)).filter(([, len]) => len >= 50).map(([at, len]) => `${len} ms silent at +${at} ms`)
-  const g = await p.page.evaluate((m) => (window as any).__e2e.glitches(m), ms) as { freezes: [number, number][]; jumps: number }
-  return [...g.freezes.map(([at, len]) => `${len} ms frozen at +${at} ms`), ...(g.jumps ? [`${g.jumps} skips`] : [])]
+  return (await gaps(p, MUSIC, ms, p.baseline * 0.3)).filter(([, len]) => len >= 50).map(([at, len]) => `${len} ms silent at +${at} ms`)
 }
 
 /** The booth state the server holds now (the first event of its stream). */
@@ -203,7 +189,7 @@ describe('booth: four people messing about', () => {
     const direct = server.url
     phones.push(
       await openPhone('chrome', chrome, direct),
-      await openPhone('iphone-path', chrome, direct, { pcm: true }),
+      await openPhone('chrome-2', chrome, direct),
       await openPhone('firefox', fox, direct),
       await openPhone('4g', chrome, `http://127.0.0.1:${PROXY_PORT}`),
     )
@@ -211,8 +197,7 @@ describe('booth: four people messing about', () => {
     await sleep(5000) // sync settles
     for (const p of phones) {
       p.baseline = (await level(p, MUSIC, 3000))?.min ?? 0
-      if (p.mse) expect(await music(p, 3000), `${p.name} plays the music before anything happens`).toBeGreaterThan(0.9)
-      else expect(p.baseline, `${p.name} plays the music before anything happens`).toBeGreaterThan(0.01)
+      expect(p.baseline, `${p.name} plays the music before anything happens`).toBeGreaterThan(0.01)
     }
     console.log(`seed ${process.env.E2E_SEED || '(random)'} → replay with E2E_SEED=${seed}`)
   })
