@@ -15,6 +15,7 @@ npm run cert                      # self-signed certificate in data/tls/
 
 npm run serve                     # build, then https://<this-machine-ip>:3000 on the LAN
                                   # plus the Tailscale Funnel (see below); -- --no-build skips the build
+npm run serve -- --docker         # same, in Docker: rebuild the image, restart the container, Funnel
 # while developing
 npm run dev:https                 # same address, hot reload
 ```
@@ -102,12 +103,14 @@ Guests get a cookie ID, with no account needed. Asking for a track that's alread
 ## Docker
 
 ```sh
-docker compose up -d --build      # https://<this-machine-ip>:3000, data in ./data
+npm run serve -- --docker         # rebuild + restart the container, then cycle the Funnel
+docker compose up -d --build      # the same without the Funnel: https://<this-machine-ip>:3000, data in ./data
+docker compose logs -f            # its output
 ```
 
 One container holds everything the desktop provides otherwise (`Dockerfile`, `docker/entrypoint.sh`): a PulseAudio daemon for the decks' virtual sinks (nothing plays on the host), Xvfb as the login browser's invisible screen (you see it through **Connect**, above), ffmpeg, Playwright's Chromium, and a self-signed certificate created in `data/tls` on first start. It uses the host network, so guests get the LAN address and phones reach port 3000, and a 1 GB `/dev/shm` for Chromium.
 
-- **Tailscale:** keep the Funnel on the host (`tailscale funnel --bg https+insecure://localhost:3000`). There's no `tailscale` inside, so the QR code shows the LAN address and the LAN redirect is off.
+- **Tailscale:** keep the Funnel on the host (`npm run serve -- --docker` handles it). There's no `tailscale` inside, so the QR code shows the LAN address and the LAN redirect is off.
 - **Ask Claude:** mount your Claude Code login (`~/.claude`, `~/.claude.json`; commented out in `docker-compose.yml`). Build with `--build-arg WITH_CLAUDE=0` to leave the CLI out.
 - **Already logged in on a desktop?** Copy `data/` over: credentials and profiles work as they are.
 - The container runs as uid 1000, normally the owner of `./data`.
