@@ -32,11 +32,11 @@ export interface PadInfo extends Pad {
 type PadEntry = Omit<PadInfo, 'durationSec'>
 
 type Persisted = Pick<BoothState, 'eq' | 'color' | 'duckDb' | 'padVolume'>
-export type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'lights'
+export type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'lights' | 'pitchUp' | 'pitchDown'
 
 class Booth {
   private s: Persisted = { eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: DEFAULT_DUCK_DB, padVolume: 0.8 }
-  private holds = { talkover: 0, echo: 0, brake: 0, rewind: 0, build: 0, lights: 0, stutter: 0, xy: 0 }
+  private holds = { talkover: 0, echo: 0, brake: 0, rewind: 0, build: 0, lights: 0, pitchUp: 0, pitchDown: 0, stutter: 0, xy: 0 }
   private xy: XY | null = null
   private stutter: number | null = null
   private holdTimers: Record<string, ReturnType<typeof setTimeout>> = {}
@@ -46,7 +46,7 @@ class Booth {
   private padList: Promise<PadInfo[]> | null = null
 
   init() {
-    this.loaded ??= readJson<Partial<Persisted> & { lights?: boolean }>('fx.json', {}).then(({ lights: _old, ...fx }) => {
+    this.loaded ??= readJson<Partial<Persisted> & { lights?: boolean; pitch?: number }>('fx.json', {}).then(({ lights: _old, pitch: _old2, ...fx }) => {
       Object.assign(this.s, fx)
     })
     return this.loaded
@@ -65,6 +65,8 @@ class Booth {
       xy: now < this.holds.xy ? this.xy : null,
       pads: [...this.playing.keys()],
       lights: now < this.holds.lights,
+      pitchUp: now < this.holds.pitchUp,
+      pitchDown: now < this.holds.pitchDown,
       bpm: mixer.bpm,
     }
   }

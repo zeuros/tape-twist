@@ -20,6 +20,9 @@ export interface BoothState {
   color: ColorPreset
   duckDb: number
   padVolume: number
+  /** Pitch ▲ / ▼ held: the music bends up / down while held, and glides back on release. */
+  pitchUp: boolean
+  pitchDown: boolean
   talkover: boolean
   echo: boolean
   brake: boolean
@@ -37,6 +40,11 @@ export interface BoothState {
   /** Tempo of the music, measured on the server (null: unsure). */
   bpm: number | null
 }
+
+/** Pitch buttons: how far a hold bends, how fast (semitones per second), and the glide back (s). */
+export const PITCH_MAX = 12
+export const PITCH_SPEED = 1.5
+export const PITCH_RELEASE = 0.3
 
 export const STUTTER_BEATS = [1, 1 / 2, 1 / 4, 1 / 8] as const
 /** Tempo used while the server isn't sure of it. */

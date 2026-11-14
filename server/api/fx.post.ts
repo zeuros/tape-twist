@@ -3,7 +3,7 @@ import { booth, COLORS } from '../utils/booth'
 import { mixer } from '../utils/mixer'
 
 interface FxCommand {
-  action: 'eq' | 'color' | 'duck' | 'padVolume' | 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'stutter' | 'lights' | 'xy' | 'pad' | 'stopPads'
+  action: 'eq' | 'color' | 'duck' | 'padVolume' | 'pitchUp' | 'pitchDown' | 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'stutter' | 'lights' | 'xy' | 'pad' | 'stopPads'
   eq?: { low?: number; mid?: number; high?: number }
   color?: ColorPreset
   value?: number
@@ -40,6 +40,8 @@ export default defineEventHandler(async (event) => {
     case 'build': booth.hold('build', !!c.on, from); break
     case 'stutter': booth.setStutter(c.on === false ? null : Number(c.value), from); break
     case 'lights': booth.hold('lights', !!c.on, from); break
+    case 'pitchUp': booth.hold('pitchUp', !!c.on, from); break
+    case 'pitchDown': booth.hold('pitchDown', !!c.on, from); break
     case 'xy': booth.setXY(c.on === false ? null : { x: num(c.x, 0, 1), y: num(c.y, 0, 1) }, from); break
     case 'pad':
       if (c.on !== false && !mixer.listenerCount) {

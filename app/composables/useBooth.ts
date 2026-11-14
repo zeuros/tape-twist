@@ -1,6 +1,6 @@
 import { DEFAULT_BPM, DEFAULT_DUCK_DB, type BoothEvent, type BoothState, type ColorPreset, type Eq, type Pad, type XY } from '#shared/types/booth'
 
-type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'lights'
+type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'lights' | 'pitchUp' | 'pitchDown'
 
 /**
  * The booth (pads, holds, XY pad, colour, EQ). The server holds the shared state and relays
@@ -9,7 +9,7 @@ type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'lights'
  * devices follow within a few ms.
  */
 export const useBooth = defineSingleton(() => {
-  const booth = ref<BoothState>({ eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: DEFAULT_DUCK_DB, padVolume: 0.8, talkover: false, echo: false, brake: false, rewind: false, build: false, stutter: null, xy: null, pads: [], lights: false, bpm: null })
+  const booth = ref<BoothState>({ eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: DEFAULT_DUCK_DB, padVolume: 0.8, talkover: false, echo: false, brake: false, rewind: false, build: false, stutter: null, xy: null, pads: [], lights: false, pitchUp: false, pitchDown: false, bpm: null })
   const pads = ref<Pad[]>([])
   const fxError = ref('')
   /** Hold buttons pressed here count at once, before the server confirms. */
@@ -45,6 +45,7 @@ export const useBooth = defineSingleton(() => {
     a.setColor(b.color)
     a.setDuckDb(b.duckDb)
     a.setPadVolume(b.padVolume)
+    a.setPitchBend(Number(!!held.pitchUp || b.pitchUp) - Number(!!held.pitchDown || b.pitchDown))
     a.setTalkover(!!held.talkover || b.talkover)
     a.setEcho(!!held.echo || b.echo)
     a.setBrake(!!held.brake || b.brake)

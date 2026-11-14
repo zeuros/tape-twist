@@ -5,10 +5,10 @@
  *    what changes it — echo, EQ, colour, duck (these respond within ~60 ms);
  *  - fx context (lowest latency): pads and the mic voice, added on top (instant).
  *
- *   stream ─▶ brake ─▶ rewind ─▶ stutter ─┬──────────────────────────────┬─▶ EQ ─▶ XY filter ─▶ build-up high-pass ─┐
- *    (tape-stop  (reverse   (looping       └─ echo send ─▶ ping-pong delay ┘                                          │
- *     delay)      delay)     delay)                                                                                    │
- *     ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+ *   stream ─▶ pitch ─▶ brake ─▶ rewind ─▶ stutter ─┬──────────────────────────────┬─▶ EQ ─▶ XY filter ─▶ build-up high-pass ─┐
+ *    (two sweeping (tape-stop  (reverse   (looping └─ echo send ─▶ ping-pong delay ┘                                          │
+ *     delay taps)   delay)      delay)     delay)                                                                         │
+ *     ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
  *     └┬─ dry ────────────────┬─▶ duck ─▶ out (+ build-up riser, snare roll, drop) ─▶ limiter ─▶ speaker
  *      └─ colour ─▶ wet (+noise)┘                └─▶ kick meter (light show)
  *
@@ -20,6 +20,7 @@ import type { ColorPreset, Eq, VoicePreset, XY } from '#shared/types/booth'
 import { biquad, dbToGain, driveCurve, gainNode, noiseBuffer, softLimitCurve } from './booth/dsp'
 import { measureRoom } from './booth/autoSync'
 import { VoiceChannel } from './booth/voice'
+import { MusicPitch } from './booth/pitch'
 
 export interface PadInfo {
   id: string
@@ -84,6 +85,7 @@ export class BoothAudio {
   private noise: AudioBufferSourceNode | null = null
   private wetSum: GainNode
   private duck: GainNode
+  private pitch: MusicPitch
   private brakeDelay: DelayNode
   private brakeGain: GainNode
   private rewindDelay: DelayNode
@@ -133,7 +135,10 @@ export class BoothAudio {
     this.brakeDelay.delayTime.value = 0
     this.brakeGain = gain()
     const head = (this.head = gain())
-    src.connect(this.brakeDelay).connect(this.brakeGain)
+    // Pitch buttons: bend the music's key while held, keeping its timing (app/utils/booth/pitch.ts).
+    this.pitch = new MusicPitch(ctx)
+    src.connect(this.pitch.input)
+    this.pitch.output.connect(this.brakeDelay).connect(this.brakeGain)
 
     // Rewind: the same trick pushed further. The delay grows faster than time passes, so the
     // music plays backwards (growth rate 4 = 3× speed in reverse); letting go cuts back to live.
@@ -382,6 +387,11 @@ export class BoothAudio {
 
   private updateEcho() {
     this.glide(this.echoSend.gain, Math.max(this.echoHeld ? 1 : 0, this.xyEcho), 0.015)
+  }
+
+  /** Pitch ▲ / ▼ held (+1 / -1): the music bends that way; 0 glides it back (see MusicPitch). */
+  setPitchBend(dir: number) {
+    this.pitch.bend(Math.sign(dir) as -1 | 0 | 1)
   }
 
   // --------------------------------------------------------- XY and brake
