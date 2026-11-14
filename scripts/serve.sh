@@ -3,7 +3,8 @@
 # Needs only bash and Docker (Compose v2).
 #   ./scripts/serve.sh               build and (re)start
 #   ./scripts/serve.sh --no-build    restart without rebuilding
-#   ./scripts/serve.sh --funnel      also publish it through the Tailscale Funnel (optional)
+#   ./scripts/serve.sh --funnel      also publish it through the Tailscale Funnel (optional),
+#                                    and (re)build the Android app for it (scripts/apk.sh)
 # (`npm run serve -- <options>` runs the same.)
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -54,4 +55,9 @@ for _ in $(seq 90); do
   sleep 1
 done
 grep -q 'Tape Twist is up' <<<"$out" || echo "The server didn't say it's up after 90 s: see docker compose logs" >&2
+
+# The Android app opens the Funnel address: rebuilt when that or its sources changed (cached).
+if ((funnel)) && [ -n "${FUNNEL_HOST:-}" ]; then
+  ./scripts/apk.sh "https://$FUNNEL_HOST" || echo "⚠ The Android app didn't build (the server runs anyway)" >&2
+fi
 echo "Logs: docker compose logs -f    Stop: docker compose down"

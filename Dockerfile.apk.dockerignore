@@ -1,0 +1,11 @@
+# Only what the Android build needs (Dockerfile.apk); no host build output or SDK path.
+*
+!package.json
+!package-lock.json
+!capacitor.config.ts
+!native
+!android
+android/local.properties
+android/.gradle
+android/.idea
+android/**/build

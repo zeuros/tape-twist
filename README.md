@@ -63,13 +63,14 @@ Each start turns the Funnel off and on again (an old one sometimes breaks); the 
 
 ## 📲 Android app
 
-`npm run android:apk` builds a small shell (it needs JDK 21) that opens the player full screen, with lock-screen controls. Rebuild it only when the native shell, `capacitor.config` or the server URL changes; app updates arrive by themselves. The server offers the APK at `/tape-twist.apk`.
+A small shell that opens the player full screen, with lock-screen controls. It opens the Funnel address (the phone's WebView refuses the LAN's self-signed certificate), so `./scripts/serve.sh --funnel` builds it, in Docker, into `data/tape-twist.apk`; the server offers it at `/tape-twist.apk`. The first build takes a few minutes (it fetches the Android SDK); after that it's cached and only rebuilds when the native shell, `capacitor.config` or the address changes. App updates arrive by themselves. `./scripts/apk.sh [https://<host>]` builds it on its own.
 
 ## 🛠️ Commands
 
 | Command | What it does |
 | --- | --- |
-| `./scripts/serve.sh` | Build and (re)start the container (`--no-build`, `--funnel`) |
+| `./scripts/serve.sh` | Build and (re)start the container (`--no-build`, `--funnel`: also the Android app) |
+| `./scripts/apk.sh` | Build the Android app on its own (`npm run android:apk`) |
 | `docker compose logs -f` / `down` | Follow it / stop it |
 | `npm run dev:https` | Hot-reload dev server (needs Node, PipeWire or PulseAudio, ffmpeg) |
 | `npm run typecheck` | Type-check the whole project |

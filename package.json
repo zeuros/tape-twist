@@ -15,7 +15,8 @@
     "serve": "scripts/serve.sh",
     "android:sync": "cap sync android",
     "android:open": "cap open android",
-    "android:apk": "cap sync android && (cd android && ./gradlew assembleDebug) && mkdir -p data && cp android/app/build/outputs/apk/debug/app-debug.apk data/tape-twist.apk"
+    "android:apk": "./scripts/apk.sh",
+    "android:apk:local": "cap sync android && (cd android && ./gradlew assembleDebug) && mkdir -p data && cp android/app/build/outputs/apk/debug/app-debug.apk data/tape-twist.apk"
   },
   "type": "module",
   "dependencies": {

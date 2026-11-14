@@ -17,3 +17,16 @@ services:
       # - ~/.claude:/home/app/.claude
       # - ~/.claude.json:/home/app/.claude.json
     restart: unless-stopped
+
+  # The Android app, built on demand (`./scripts/apk.sh`, run by `serve.sh --funnel`): copies
+  # data/tape-twist.apk and exits. Its own image (Dockerfile.apk), never started by `up`.
+  apk:
+    profiles: [apk]
+    build:
+      context: .
+      dockerfile: Dockerfile.apk
+      args:
+        CAP_SERVER_URL: ${CAP_SERVER_URL:-}
+    user: "1000:1000"
+    volumes:
+      - ./data:/out:z
