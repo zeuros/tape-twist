@@ -2,8 +2,8 @@ import type { Evening, FavItem, Playlist } from '#shared/types/music'
 
 /**
  * The evening: all playlists, the open one (being edited, where new songs land), and
- * saving. Saved 600 ms after the last change; changes made elsewhere (another player, an
- * approved guest request) are picked up through the engine's `eveningRev`.
+ * saving. Saved 600 ms after the last change; changes made elsewhere (another player) are
+ * picked up through the engine's `eveningRev`.
  */
 export const useEvening = defineSingleton(() => {
   const doc = ref<Evening>({ playlists: [{ id: 'main', title: 'Chill & feels', startTime: '20:00', items: [] }], open: 'main', rev: 0 })
@@ -81,6 +81,28 @@ export const useEvening = defineSingleton(() => {
     pl.items.push(...added)
     return added.length
   }
+  /**
+   * Lay out a playlist's songs from `from` on as Claude arranged them (existing songs by index,
+   * new ones by index in `added`). Only if the playlist still holds exactly `ids` (nothing changed
+   * while Claude was thinking); otherwise just append the new songs. Returns how many were added.
+   */
+  function arrange(playlistId: string, ids: string[], from: number, slots: ({ cur: number } | { add: number })[], added: FavItem[]) {
+    const pl = doc.value.playlists.find((p) => p.id === playlistId)
+    const same = pl && pl.items.length >= ids.length && ids.every((id, i) => pl.items[i]!.id === id)
+    if (!same) return { added: append(playlistId, added), arranged: false }
+    const have = new Set(pl.items.map((i) => i.id))
+    const fresh = new Set<string>()
+    const tail = slots.flatMap((s) => {
+      if ('cur' in s) return pl.items[s.cur] ? [pl.items[s.cur]!] : []
+      const f = added[s.add]
+      if (!f || have.has(f.id) || fresh.has(f.id)) return []
+      fresh.add(f.id)
+      return [{ ...f }]
+    })
+    // Songs beyond what Claude was shown keep their place at the end.
+    pl.items.splice(from, ids.length - from, ...tail)
+    return { added: fresh.size, arranged: true }
+  }
   function removeAt(i: number) {
     evening.value.items.splice(i, 1)
   }
@@ -112,6 +134,6 @@ export const useEvening = defineSingleton(() => {
   return {
     doc, evening, inEvening, saved, applyEvening, reload, sync,
     newPlaylist, deletePlaylist, playlistSec,
-    add, append, removeAt, moveTo, swap, schedule, totalSec, endClock,
+    add, append, arrange, removeAt, moveTo, swap, schedule, totalSec, endClock,
   }
 })

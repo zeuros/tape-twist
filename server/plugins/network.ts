@@ -17,9 +17,9 @@ export default defineNitroPlugin(() => {
     const lines = [
       '',
       '🎧 Tape Twist is up',
-      `   Local    ${local}/player`,
-      lan && `   LAN      ${home}/player`,
-      funnel && `   Funnel   https://${funnel}/player   (public)`,
+      `   Local    ${local}/`,
+      lan && `   LAN      ${home}/`,
+      funnel && `   Funnel   https://${funnel}/   (public)`,
       `   Guests   ${funnel ? `https://${funnel}/` : `${home}/`}`,
       '',
     ]

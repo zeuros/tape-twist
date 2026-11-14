@@ -3,7 +3,7 @@
 services:
   tape-twist:
     build: .
-    # Host network: the app shows guests its LAN address (QR code), and phones reach port 3000.
+    # Host network: the QR code shows the LAN address, and phones reach port 3000.
     network_mode: host
     # Chromium (the decks, the login browser) needs a big /dev/shm.
     shm_size: 1gb

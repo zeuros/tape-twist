@@ -28,7 +28,7 @@ const { eng } = useEngine()
         </button>
       </div>
       <PlayerApkLink />
-      <PlayerGuestQr />
+      <PlayerQrLink />
     </div>
   </header>
 

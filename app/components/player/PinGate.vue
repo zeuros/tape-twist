@@ -59,6 +59,5 @@ onBeforeUnmount(() => clearInterval(timer))
     />
     <button class="primary" :disabled="busy || wait > 0 || !pin">Unlock</button>
     <p class="pin-msg" aria-live="polite">{{ msg }}</p>
-    <a href="/">Guest page →</a>
   </form>
 </template>

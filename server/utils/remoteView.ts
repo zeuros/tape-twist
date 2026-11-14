@@ -2,7 +2,7 @@ import type { BrowserContext, CDPSession, Page } from 'playwright'
 import type { Platform } from '#shared/types/music'
 
 /**
- * The login browser, shown in /player: the server's own Chromium tab is streamed as JPEG
+ * The login browser, shown in the player: the server's own Chromium tab is streamed as JPEG
  * frames (Chrome's screencast, sent only when the page changes) and the phone's taps, scrolls
  * and typing are replayed into it. Deezer and SoundCloud can't be shown in an iframe, and a
  * page couldn't read their cookies anyway; this way the capture (server/utils/capture.ts)

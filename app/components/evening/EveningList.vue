@@ -63,7 +63,6 @@ const handleUp = () => (dragFrom.value = null)
         <div class="sub">
           <PlatformBadge :platform="it.platform" />
           {{ it.artist }} · {{ formatDuration(it.durationSec) }}
-          <span v-if="it.requestedBy" class="badge req">🙋 {{ it.requestedBy }}</span>
         </div>
       </div>
       <div class="ops">

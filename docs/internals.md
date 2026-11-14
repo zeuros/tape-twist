@@ -66,15 +66,13 @@ The server mix (`server/utils/mixer.ts`) is just the music, as a Web Audio graph
 
 ## Ask Claude
 
-One line at the top of each playlist: a request ("calm bass music for ambience. go around Kebuffeule (Iorie remix)"), how many songs, ✨. The songs are appended to that playlist. Claude runs through the Claude Code CLI installed on the server machine (`claude -p`, its own login; no API key), one request at a time, Opus 5.5 at low effort (`CLAUDE_MIX_MODEL`, `CLAUDE_MIX_EFFORT`, `CLAUDE_BIN` to change). Claude first writes searches; the server gathers real SoundCloud/Deezer results plus SoundCloud's "related tracks" of the reference songs, then Claude picks and orders songs from that list. Its note on the direction it took shows under the line.
+One line at the top of each playlist: a request ("calm bass music for ambience. go around Kebuffeule (Iorie remix)"), how many songs, ✨. The songs are placed in that playlist. Claude runs through the Claude Code CLI installed on the server machine (`claude -p`, its own login; no API key), one request at a time, Opus 5.5 at low effort (`CLAUDE_MIX_MODEL`, `CLAUDE_MIX_EFFORT`, `CLAUDE_BIN` to change). Claude first writes searches; the server gathers real SoundCloud/Deezer results plus SoundCloud's "related tracks" of the reference songs, then Claude lays out the upcoming part of the playlist: the upcoming songs are numbered `P0…`, the candidates `N0…`, and it answers with one list mixing both. So it can only name real songs; it may slot the new ones between the upcoming ones and move those when asked ("put the sea shanties together"). The server checks the answer: unknown or repeated numbers are dropped, a forgotten upcoming song goes back after the one it followed, and the songs already played (up to the one playing) never move. The page applies the layout only if the playlist didn't change while Claude was thinking; otherwise the new songs are appended. A request that only asks to rearrange skips the catalog searches. Claude's note on what it did shows under the line.
 
-## Guest requests
-
-Guests get a cookie ID, with no account needed. Asking for a track that's already requested counts as a vote. Each guest can have at most 5 pending requests. Approving a request inserts it right after the current track, behind earlier approved requests. The evening list has a revision number, so two open players (or a player plus approvals) never silently overwrite each other.
+The evening list has a revision number, so two open players never silently overwrite each other.
 
 ### Reaching it from outside (Tailscale Funnel)
 
-Optional (`--funnel`, see the README). `tailscale funnel --bg https+insecure://localhost:3000` publishes the app at `https://<machine>.<tailnet>.ts.net`. Anyone with that link reaches the guest page; `/player` and its API need the host PIN. Still, turn it off after the party (`tailscale funnel reset`). A visitor who opens the ts.net link from the home Wi-Fi is sent to the LAN address (`https://192.168.1.x:3000`) so the stream doesn't go out to the internet and back: Funnel passes the visitor's address, and the server compares it with the home's public IP from `tailscale netcheck`. Set `LAN_REDIRECT=0` to turn that off. The QR button in the player header shows the `/player` link as a QR code: the Funnel one while `tailscale funnel status` says it's on (`funnelHost()` in `server/utils/network.ts`), else the LAN one. The same addresses are printed at start-up (`server/plugins/network.ts`).
+Optional (`--funnel`, see the README). `tailscale funnel --bg https+insecure://localhost:3000` publishes the app at `https://<machine>.<tailnet>.ts.net`. Anyone with that link reaches the lock screen; the API needs the host PIN. Still, turn it off after the party (`tailscale funnel reset`). A visitor who opens the ts.net link from the home Wi-Fi is sent to the LAN address (`https://192.168.1.x:3000`) so the stream doesn't go out to the internet and back: Funnel passes the visitor's address, and the server compares it with the home's public IP from `tailscale netcheck`. Set `LAN_REDIRECT=0` to turn that off. The QR button in the player header shows the player's link as a QR code: the Funnel one while `tailscale funnel status` says it's on (`funnelHost()` in `server/utils/network.ts`), else the LAN one. The same addresses are printed at start-up (`server/plugins/network.ts`).
 
 ## Docker
 
@@ -84,7 +82,7 @@ docker compose up -d --build      # the same, by hand: https://<this-machine-ip>
 docker compose logs -f            # its output
 ```
 
-One container holds everything the desktop provides otherwise (`Dockerfile`, `docker/entrypoint.sh`): a PulseAudio daemon for the decks' virtual sinks (nothing plays on the host), Xvfb as the login browser's invisible screen (you see it through **Connect**, above), ffmpeg, Playwright's Chromium, and a self-signed certificate created in `data/tls` on first start. It uses the host network, so guests get the LAN address and phones reach port 3000, and a 1 GB `/dev/shm` for Chromium.
+One container holds everything the desktop provides otherwise (`Dockerfile`, `docker/entrypoint.sh`): a PulseAudio daemon for the decks' virtual sinks (nothing plays on the host), Xvfb as the login browser's invisible screen (you see it through **Connect**, above), ffmpeg, Playwright's Chromium, and a self-signed certificate created in `data/tls` on first start. It uses the host network, so the QR code gets the LAN address and phones reach port 3000, and a 1 GB `/dev/shm` for Chromium.
 
 - **Tailscale:** the Funnel stays on the host. The image only has the `tailscale` command; `docker-compose.funnel.yml` (added by `--funnel`) mounts the host's `tailscaled.sock`, so the container can read the Funnel address and the home's public IP. Without it the QR code shows the LAN address and the LAN redirect is off.
 - **Ask Claude:** mount your Claude Code login (`~/.claude`, `~/.claude.json`; commented out in `docker-compose.yml`). Build with `--build-arg WITH_CLAUDE=0` to leave the CLI out.
@@ -94,21 +92,21 @@ One container holds everything the desktop provides otherwise (`Dockerfile`, `do
 ## Project layout
 
 ```
-shared/types/        types used by both sides (songs and playlists, booth, engine and requests)
+shared/types/        types used by both sides (songs and playlists, booth, engine)
 app/
-  pages/             index.vue (guests), player.vue (host): they only put the components together
-  components/        PlatformBadge, track/ (TrackArt, TrackRow), player/ (header, search, requests,
+  pages/             index.vue: it only puts the components together
+  components/        PlatformBadge, track/ (TrackArt, TrackRow), player/ (header, search, QR link,
                      player bar), evening/ (playlists, Ask Claude, the list), booth/ (pads, holds, XY, EQ…)
   composables/       state and logic, one concern each: usePlatforms, useEvening, useEngine,
-                     useListening, useBooth, useVoice, useRequests (shared by the whole page),
+                     useListening, useBooth, useVoice (shared by the whole page),
                      useFavoriteSearch, usePadRecorder, useConfirmTap (per component)
   utils/             framework-free code: liveAudio / livePcm / pcmBlocks / pcmScheduler /
                      serverClock (synced playback),
                      boothAudio + booth/ (dsp, voice) (Web Audio effects), format, prefs
-  assets/css/        base, player, booth, responsive, guest
+  assets/css/        base, player, booth, responsive
 server/
   api/               thin routes: read the input, call server/utils
-  utils/             engine, deck, mixer, booth, requests, store; platforms (+ platformAuth,
+  utils/             engine, deck, mixer, booth, store; platforms (+ platformAuth,
                      soundcloud, deezer), claudeMix
 ```
 

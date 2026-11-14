@@ -282,7 +282,7 @@ class Booth {
 const INSTANT_MAX_BYTES = 3 * 1024 * 1024
 const INSTANT_MAX_SEC = 15
 
-/** Only myinstants.com is ever fetched (the link comes from a guest's phone). */
+/** Only myinstants.com is ever fetched (the link comes from a phone). */
 function myinstantsUrl(link: string) {
   let u: URL
   try {

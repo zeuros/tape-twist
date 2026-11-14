@@ -1,7 +1,7 @@
 #!/bin/sh
 # Starts what the desktop provides outside Docker, then the server:
 # - PulseAudio: the decks' virtual sinks live here (the app creates them with pactl).
-# - Xvfb: an invisible screen for the login browser (it's seen through /player).
+# - Xvfb: an invisible screen for the login browser (it's seen through the player).
 # - A self-signed certificate in data/tls on first start (the mic needs https on the LAN).
 set -e
 cd /app

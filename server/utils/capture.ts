@@ -96,7 +96,7 @@ export function cancelCapture(platform: Platform) {
 
 /**
  * A desktop to show the login window on. Without one (Docker without Xvfb, a server), the
- * login browser runs headless and is only seen through the view in /player.
+ * login browser runs headless and is only seen through the view in the player.
  */
 const hasDisplay = () => !!(process.env.DISPLAY || process.env.WAYLAND_DISPLAY)
 
@@ -112,7 +112,7 @@ async function doCapture(platform: Platform, interactive: boolean, size?: ViewSi
   const previous = await loadCreds(platform)
 
   const headless = !interactive || !hasDisplay()
-  // Shown in /player: the phone's size, so the login page fits its screen.
+  // Shown in the player: the phone's size, so the login page fits its screen.
   const view = interactive && size ? { width: size.width, height: size.height } : null
   const ctx: BrowserContext = await chromium.launchPersistentContext(dir, {
     headless,
