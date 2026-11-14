@@ -2,8 +2,8 @@ import type { Evening, FavItem, Playlist } from '#shared/types/music'
 
 /**
  * The evening: all playlists, the open one (being edited, where new songs land), and
- * saving. Saved 600 ms after the last change; changes made elsewhere (another player, an
- * approved guest request) are picked up through the engine's `eveningRev`.
+ * saving. Saved 600 ms after the last change; changes made elsewhere (another player) are
+ * picked up through the engine's `eveningRev`.
  */
 export const useEvening = defineSingleton(() => {
   const doc = ref<Evening>({ playlists: [{ id: 'main', title: 'Chill & feels', startTime: '20:00', items: [] }], open: 'main', rev: 0 })

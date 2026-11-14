@@ -25,8 +25,6 @@ export interface FavCache {
 
 export interface EveningEntry extends FavItem {
   note?: string
-  /** Set when the item came from an approved guest request. */
-  requestedBy?: string
 }
 
 export interface Playlist {
@@ -44,8 +42,6 @@ export interface Evening {
   rev?: number
 }
 
-/** What guests may see of a track (no URLs or embed links). */
-export type PublicItem = Pick<FavItem, 'id' | 'title' | 'artist' | 'artwork' | 'platform' | 'kind' | 'durationSec'>
 
 /** Connection state of one platform (`GET /api/status`). */
 export interface PlatformStatus {

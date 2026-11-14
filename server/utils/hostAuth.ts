@@ -5,7 +5,7 @@ import type { H3Event } from 'h3'
 import { DATA_DIR } from './store'
 
 /**
- * The host PIN: everything but the guest page needs it (see server/middleware/0.hostAuth.ts).
+ * The host PIN: the API needs it (see server/middleware/0.hostAuth.ts).
  * A right PIN sets a cookie holding HMAC(secret, PIN): it survives restarts, and changing the
  * PIN logs every device out. Wrong tries are throttled to one every 10 s, for
  * everyone at once (Funnel visitors can change address at will, so a per-IP limit wouldn't hold).

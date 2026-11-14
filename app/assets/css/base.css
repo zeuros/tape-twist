@@ -67,5 +67,3 @@ h2 { font-weight: 800; letter-spacing: -.02em; }
 .badge.soundcloud { background: color-mix(in srgb, var(--sc) 25%, transparent); color: var(--sc); }
 .badge.deezer { background: color-mix(in srgb, var(--dz) 28%, transparent); color: #c98bff; }
 .badge.set { background: var(--panel-2); color: var(--muted); }
-.badge.req { background: color-mix(in srgb, var(--ok) 20%, transparent); color: var(--ok); margin-left: 6px; }
-.count-badge { display: inline-block; min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--grad); color: #1a1208 !important; box-shadow: var(--glow); font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; margin-left: 4px; }

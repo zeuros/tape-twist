@@ -1,16 +1,15 @@
 <script setup lang="ts">
 /**
- * The host's page: search, the evening's playlists, the booth and guest requests, with the
- * player bar at the bottom. On a phone the four panels are tabs.
+ * The app: search, the evening's playlists and the booth, with the player bar at the bottom.
+ * On a phone the three panels are tabs.
  */
 const platforms = usePlatforms()
 const { evening, reload: loadEvening } = useEvening()
 const engine = useEngine()
 const booth = useBooth()
 const listen = useListening()
-const { pending } = useRequests()
 
-const tab = ref<'favs' | 'evening' | 'booth' | 'requests'>('favs')
+const tab = ref<'favs' | 'evening' | 'booth'>('favs')
 /** Host PIN entered on this device? null while checking (nothing mounts or fetches until it's known). */
 const unlocked = ref<boolean | null>(null)
 const pinLength = ref(4)
@@ -45,18 +44,12 @@ onBeforeUnmount(() => {
       <button :class="{ on: tab === 'favs' }" @click="tab = 'favs'">Search <span>{{ platforms.allFavs.value.length }}</span></button>
       <button :class="{ on: tab === 'evening' }" @click="tab = 'evening'">Evening <span>{{ evening.items.length }}</span></button>
       <button :class="{ on: tab === 'booth' }" @click="tab = 'booth'">Booth</button>
-      <button :class="{ on: tab === 'requests' }" @click="tab = 'requests'">
-        Requests <span v-if="pending.length" class="count-badge">{{ pending.length }}</span>
-      </button>
     </nav>
 
     <main class="cols">
       <PlayerSearchPanel :class="{ hidden: tab !== 'favs' }" />
       <EveningPanel :class="{ hidden: tab !== 'evening' }" />
-      <aside class="side" :class="{ hidden: tab !== 'booth' && tab !== 'requests' }">
-        <BoothPanel :class="{ hidden: tab !== 'booth' }" />
-        <PlayerRequestsPanel :class="{ hidden: tab !== 'requests' }" />
-      </aside>
+      <BoothPanel :class="{ hidden: tab !== 'booth' }" />
     </main>
 
     <PlayerRemoteBar />

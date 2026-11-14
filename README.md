@@ -24,8 +24,7 @@
 - 📼 **Evening playlists.** Give songs start times; the server plays them with equal-power crossfades and bass swaps.
 - 📱 **Every phone is a speaker.** Tap *Listen here* and all devices play the same instant (within ~10–30 ms on Wi-Fi), with a slider to cancel Bluetooth delay.
 - 🎛️ **A booth for everyone listening.** Pads, talkover with funny voices, tape brake, rewind, build-up, stutter, XY filter, EQ, a light show on the kicks, and pads you record yourself.
-- 🙋 **Guest requests.** Friends open the link, search, request and vote; you approve.
-- 🤖 **Ask Claude.** "Calm bass music for ambience, around this track", ✨, and real songs get appended.
+- 🤖 **Ask Claude.** "Calm bass music for ambience, around this track", ✨, and real songs land in the playlist, placed where they fit (it can also regroup the upcoming ones on request).
 
 ## 🚀 Setup
 
@@ -56,14 +55,13 @@ One container holds everything: a PulseAudio daemon for the decks, a virtual scr
 1. **Open the player** at `https://<this-machine-ip>:3000/player` and accept the certificate warning (once per phone; HTTPS is what lets the mic work).
 2. **Enter the PIN.** It's `1234` unless you put your own in `data/host-pin` (or `HOST_PIN`); restart after changing it.
 3. **Connect** SoundCloud and Deezer. The login page shows right in the player, even on a phone: log in as usual, popups and 2FA included. Your session is saved in `data/` and refreshed by itself.
-4. **Build a playlist**, press play, and hit **Listen here** on every phone near a speaker.
-5. **Share the guest link** (QR button in the header) so friends can request songs.
+4. **Build a playlist**, press play, and hit **Listen here** on every phone near a speaker (the QR button in the header opens the player on another phone).
 
 ## 🌍 Reaching it from outside
 
 `npm run serve` publishes the app through **Tailscale Funnel** at `https://<machine>.<tailnet>.ts.net`, turning it off and on again at each start (an old Funnel sometimes breaks).
 
-- Guests reach the guest page; `/player` and its API need the PIN, and a wrong PIN blocks every try for 10 s.
+- Everything needs the PIN, and a wrong PIN blocks every try for 10 s.
 - Visitors on your home Wi-Fi are sent to the LAN address, so the stream doesn't go out to the internet and back (`LAN_REDIRECT=0` turns that off).
 - Run `sudo tailscale set --operator=$USER` once so it stops asking for sudo, and `tailscale funnel reset` after the party.
 

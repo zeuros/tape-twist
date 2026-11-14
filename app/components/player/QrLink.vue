@@ -2,13 +2,20 @@
 /**
  * A small QR button; opens the /player link as a full-screen QR code to scan with a phone.
  * With Tailscale it's the short Funnel name (https://c-j.tailXXXX.ts.net/player): phones on the home
- * Wi-Fi get redirected to the LAN address by the server, the others stay on Funnel.
+ * Wi-Fi get redirected to the LAN address by the server, the others stay on Funnel. Without it,
+ * the address this page was opened on, or the LAN address when that's localhost (a phone can't
+ * reach the host's "localhost").
  */
 import QRCode from 'qrcode'
 
-const { guestUrl, load } = useGuestUrl()
 const tsHost = ref<string | null>(null)
-const playerUrl = computed(() => (tsHost.value ? `https://${tsHost.value}/player` : `${guestUrl.value}player`))
+const lanIp = ref<string | null>(null)
+const playerUrl = computed(() => {
+  if (tsHost.value) return `https://${tsHost.value}/player`
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+  const host = local && lanIp.value ? `${lanIp.value}${location.port ? `:${location.port}` : ''}` : location.host
+  return `${location.protocol}//${host}/player`
+})
 const open = ref(false)
 const svg = ref('')
 
@@ -22,8 +29,13 @@ function onKey(e: KeyboardEvent) {
 }
 onMounted(async () => {
   document.addEventListener('keydown', onKey)
-  load()
-  tsHost.value = (await $fetch<{ host: string | null }>('/api/tailscale-host').catch(() => null))?.host ?? null
+  const [ts, ips] = await Promise.all([
+    $fetch<{ host: string | null }>('/api/tailscale-host').catch(() => null),
+    $fetch<string[]>('/api/lan').catch(() => []),
+  ])
+  tsHost.value = ts?.host ?? null
+  // Prefer a home-network address over Docker bridges and VPNs.
+  lanIp.value = ips.find((ip) => /^(192\.168|10)\./.test(ip)) ?? ips[0] ?? null
 })
 onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 </script>

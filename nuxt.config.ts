@@ -6,7 +6,7 @@ export default defineNuxtConfig({
   ...(e2e ? { buildDir: '.nuxt-e2e' } : {}),
   ssr: false,
   devtools: { enabled: false },
-  css: ['~/assets/css/base.css', '~/assets/css/player.css', '~/assets/css/booth.css', '~/assets/css/responsive.css', '~/assets/css/guest.css'],
+  css: ['~/assets/css/base.css', '~/assets/css/player.css', '~/assets/css/booth.css', '~/assets/css/responsive.css'],
   app: {
     head: {
       title: 'Tape Twist',
@@ -21,6 +21,8 @@ export default defineNuxtConfig({
       ],
     },
   },
+  // The host page is the app: the bare address opens it.
+  routeRules: { '/': { redirect: '/player' } },
   nitro: {
     // Playwright and node-web-audio-api ship native bits and must not be bundled.
     externals: { external: ['playwright', 'playwright-core', 'node-web-audio-api'] },

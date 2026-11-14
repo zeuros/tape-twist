@@ -1,4 +1,4 @@
-import type { FavItem, PublicItem } from './music'
+import type { FavItem } from './music'
 
 export type EngineStatus = 'stopped' | 'playing' | 'paused'
 
@@ -50,37 +50,4 @@ export interface EngineSnapshot {
 /** Engine snapshot plus what the host UI needs to know about shared state. */
 export interface HostStatus extends EngineSnapshot {
   eveningRev: number
-  pendingRequests: number
 }
-
-export type RequestStatus = 'pending' | 'approved' | 'rejected'
-
-/** A guest request as the host sees it (`GET /api/requests`). */
-export interface HostRequest {
-  id: string
-  item: FavItem
-  guestName: string
-  votes: number
-  status: RequestStatus
-  createdAt: string
-  decidedAt?: string
-}
-
-/** What a guest page shows (`GET /api/guest/state`). */
-export interface GuestState {
-  title: string
-  now: (PublicItem & { status: EngineStatus; posSec: number; durSec: number }) | null
-  upNext: (PublicItem & { requestedBy?: string })[]
-  requests: {
-    id: string
-    item: PublicItem
-    guestName: string
-    votes: number
-    voted: boolean
-    mine: boolean
-    status: 'pending' | 'approved'
-  }[]
-}
-
-/** A guest search hit (`GET /api/guest/search`). */
-export type GuestSearchItem = PublicItem & { fav?: boolean }

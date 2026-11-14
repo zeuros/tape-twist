@@ -15,7 +15,6 @@ export const useEngine = defineSingleton(() => {
     eng.value = s
     engAt = Date.now()
     useEvening().sync(s.eveningRev)
-    useRequests().notePending(s.pendingRequests)
   }
 
   async function poll() {

@@ -6,7 +6,7 @@
   .remote-row { max-width: 1600px; }
 }
 @media (min-width: 861px) and (max-width: 1199px) {
-  .side { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .cols > .booth { grid-column: 1 / -1; }
   /* Not enough room for the sync note: it stays in the tooltip of the sync value. */
   .xfade .sync-note { display: none; }
 }
@@ -28,7 +28,7 @@
   .tabs button { padding: 9px 4px; font-size: 14px; }
   .cols { grid-template-columns: minmax(0, 1fr); }
   .panel { border-radius: 20px; padding: 14px; }
-  .panel.hidden, .side.hidden { display: none; }
+  .panel.hidden { display: none; }
   .conns { width: 100%; flex-wrap: nowrap; }
   .conn { flex: 1; gap: 8px; padding-left: 10px; }
   .conn button { white-space: nowrap; }

@@ -8,7 +8,7 @@
 export default defineEventHandler(async (event) => {
   if (process.env.LAN_REDIRECT === '0' || event.method !== 'GET') return
   const path = event.path.split('?')[0]
-  if (path !== '/' && path !== '/player') return
+  if (path !== '/player') return
   if (!getRequestHost(event).endsWith('.ts.net')) return
 
   const client = getRequestHeader(event, 'x-forwarded-for')?.split(',')[0]?.trim()
