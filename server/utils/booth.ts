@@ -138,7 +138,8 @@ class Booth {
 
   async pad(id: string, on: boolean, from?: string) {
     const pad = (await this.pads()).find((p) => p.id === id)
-    if (!pad) throw new Error(`Unknown pad ${id}`)
+    // A page with an old pad list (it missed the deletion): a clean 404, it reloads its pads.
+    if (!pad) throw createError({ statusCode: 404, statusMessage: 'That pad was deleted' })
     clearTimeout(this.playing.get(id))
     this.playing.delete(id)
     if (on) {

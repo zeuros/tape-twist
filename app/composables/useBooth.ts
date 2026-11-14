@@ -69,11 +69,19 @@ export const useBooth = defineSingleton(() => {
       setBooth(await $fetch<BoothState>('/api/fx', { method: 'POST', body: { action, from: clientId, ...extra } }))
     } catch (e: any) {
       showFxError(errorMessage(e))
+      // A pad deleted elsewhere while this page wasn't told: stop it here and refresh the list.
+      if (action === 'pad' && e?.response?.status === 404) {
+        void audio()?.pad(String(extra.id), false)
+        void reloadPads()
+      }
     }
   }
 
   function connect() {
     events = new EventSource('/api/fx/events') // reconnects by itself
+    // After a reconnection: pads may have been added or deleted meanwhile.
+    let opened = false
+    events.onopen = () => (opened ? void reloadPads() : (opened = true))
     events.onmessage = (m) => {
       const e = JSON.parse(m.data) as BoothEvent
       if (e.type === 'state') return setBooth(e.state)
