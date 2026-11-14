@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tape Twist</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #14111a; color: #eee; font: 16px system-ui, sans-serif; text-align: center; padding: 16px; box-sizing: border-box; }
+    button { margin-top: 16px; padding: 10px 20px; border: 0; border-radius: 8px; background: #e0457b; color: #fff; font: inherit; }
+  </style>
+</head>
+<body>
+  <div>
+    <p>Can't reach the Tape Twist server.</p>
+    <p style="opacity:.6">Is <code>npm run serve</code> running?</p>
+    <button onclick="history.back(); setTimeout(() => location.reload(), 300)">Retry</button>
+  </div>
+</body>
+</html>

@@ -49,6 +49,7 @@ function frame() {
 }
 
 async function keepScreenOn() {
+  nativeKeepAwake(true)
   try {
     lock = (await (navigator as any).wakeLock?.request('screen')) ?? null
   } catch {
@@ -64,6 +65,7 @@ watch(shown, (on) => {
     raf = requestAnimationFrame(frame)
     void keepScreenOn()
   } else {
+    nativeKeepAwake(false)
     void lock?.release().catch(() => {})
     lock = null
   }
@@ -71,6 +73,7 @@ watch(shown, (on) => {
 onMounted(() => document.addEventListener('visibilitychange', onVisible))
 onBeforeUnmount(() => {
   cancelAnimationFrame(raf)
+  nativeKeepAwake(false)
   void lock?.release().catch(() => {})
   document.removeEventListener('visibilitychange', onVisible)
 })

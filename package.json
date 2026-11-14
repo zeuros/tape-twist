@@ -12,10 +12,15 @@
     "cert": "mkdir -p data/tls && openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj /CN=tape-twist -keyout data/tls/key.pem -out data/tls/cert.pem",
     "test": "vitest run",
     "test:e2e": "TAPE_TWIST_E2E=1 nuxt build && vitest run -c vitest.e2e.config.ts",
-    "serve": "scripts/serve.sh"
+    "serve": "scripts/serve.sh",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android",
+    "android:apk": "cap sync android && (cd android && ./gradlew assembleDebug) && mkdir -p data && cp android/app/build/outputs/apk/debug/app-debug.apk data/tape-twist.apk"
   },
   "type": "module",
   "dependencies": {
+    "@capacitor-community/keep-awake": "^8.0.1",
+    "@capacitor/core": "^8.6.2",
     "mpg123-decoder": "^1.0.3",
     "node-web-audio-api": "^2.2.0",
     "nuxt": "^4.6.3",
@@ -28,6 +33,8 @@
   },
   "private": true,
   "devDependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/cli": "^8.6.2",
     "@types/node": "^26.6.6",
     "@types/qrcode": "^1.5.6",
     "typescript": "^6.0.3",
