@@ -2,7 +2,9 @@
 /** The floating player bar: progress, now playing, transport, crossfade, Listen here, sync. */
 const { eng, busy, command, loadingItem, togglePlay, shownPos, setCrossfade } = useEngine()
 const listen = useListening()
-const { listening, audioState, lag, ahead, syncLabel, syncTitle, setAhead, autoSync } = listen
+const { listening, audioState, lag, ahead, syncLabel, syncTitle, detail, setAhead, autoSync } = listen
+/** The audio path's health (margin, output delay…), shown on a tap: phones show no tooltips. */
+const showDetail = ref(false)
 const { evening } = useEvening()
 const num = (e: Event) => Number((e.target as HTMLInputElement).value)
 
@@ -136,7 +138,10 @@ function seekCancel() {
           >
             <i v-if="autoSync.busy" class="spin" /><template v-else>🎯 Auto</template>
           </button>
-          <small v-if="autoSync.note || syncLabel" class="sync-note" :title="autoSync.note || syncTitle">{{ autoSync.note || syncLabel }}</small>
+          <small v-if="autoSync.note || syncLabel" class="sync-note" :title="autoSync.note || syncTitle" @click.prevent="showDetail = !showDetail">
+            {{ detail.startsWith('⚠') ? '⚠ ' : '' }}{{ autoSync.note || syncLabel }}
+          </small>
+          <small v-if="showDetail && detail" class="sync-note sync-detail">{{ detail }}</small>
         </label>
       </div>
     </div>

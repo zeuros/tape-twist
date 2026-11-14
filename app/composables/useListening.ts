@@ -140,5 +140,5 @@ export const useListening = defineSingleton(() => {
     audio = null
   }
 
-  return { listening, audioState, lag, ahead, setAhead, autoSync, runAutoSync, syncLabel, syncTitle, getAudio, start, stop, onTrouble, onVisible, close }
+  return { listening, audioState, lag, ahead, setAhead, autoSync, runAutoSync, syncLabel, syncTitle, detail, getAudio, start, stop, onTrouble, onVisible, close }
 })

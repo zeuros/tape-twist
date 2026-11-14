@@ -156,6 +156,8 @@
 /* The sync note (a failed auto-sync, the sync source) gets its own line, leaving the slider its width */
 .xfade.ahead { flex-wrap: wrap; }
 .xfade .sync-note { flex-basis: 100%; white-space: normal; }
+.xfade .sync-note { cursor: pointer; }
+.xfade .sync-detail { cursor: auto; font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------------- PIN lock */
 .pin-gate { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; }

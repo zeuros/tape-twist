@@ -31,8 +31,11 @@ export interface SchedulerHooks {
   onUnsynced?: () => void
   /** The first block was scheduled. */
   onPlaying?: () => void
-  /** Each block placed: false when it was already over (dropped, nothing heard). */
-  onBlock?: (played: boolean) => void
+  /**
+   * Each block placed: false when it was already over (dropped, nothing heard). `lead`: seconds
+   * between scheduling it and its start (< 0: its start was cut).
+   */
+  onBlock?: (played: boolean, lead: number) => void
 }
 
 export function createScheduler(ctx: SchedulerContext, dest: AudioNode, hooks: SchedulerHooks) {
@@ -47,7 +50,7 @@ export function createScheduler(ctx: SchedulerContext, dest: AudioNode, hooks: S
     b.t = t
     b.end = t + dur
     if (b.end <= now + 0.005) {
-      hooks.onBlock?.(false)
+      hooks.onBlock?.(false, t - now)
       return (b.src = null) // too late: skip it
     }
     const src = ctx.createBufferSource()
@@ -57,7 +60,7 @@ export function createScheduler(ctx: SchedulerContext, dest: AudioNode, hooks: S
     if (t >= now) src.start(t)
     else src.start(now, (now - t) * rate) // partly late: play the rest
     b.src = src
-    hooks.onBlock?.(true)
+    hooks.onBlock?.(true, t - now)
     if (!started) {
       started = true
       hooks.onPlaying?.()

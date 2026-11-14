@@ -85,6 +85,7 @@ export function playLive(ctx: AudioContext, dest: AudioNode, url: string, onTrou
   let relinked = false // the clock link was measured again for the current run of drops
   let lastCt = ctx.currentTime
   let frozen = 0 // seconds the context's clock stood still while running
+  const leads: number[] = [] // margin of the last 5 s of blocks (s between arrival and play)
   const trouble = (why: Trouble) => {
     if (!stopped) onTrouble(why)
   }
@@ -112,7 +113,9 @@ export function playLive(ctx: AudioContext, dest: AudioNode, url: string, onTrou
     idealTime,
     onUnsynced: () => epoch != null && clock.refresh(),
     onPlaying: opts.onPlaying,
-    onBlock: (played) => {
+    onBlock: (played, lead) => {
+      leads.push(lead)
+      if (leads.length > 50) leads.shift()
       if (played) {
         skippedInRow = 0
         relinked = false
@@ -157,6 +160,20 @@ export function playLive(ctx: AudioContext, dest: AudioNode, url: string, onTrou
       const e = scheduler.lastError()
       return e == null ? null : { errorMs: e * 1000, rttMs: clock.rtt }
     },
-    detail: () => `audio ${ctx.state}, ${skipped} late blocks dropped`,
+    detail: () => {
+      // The margin is what's left of SYNC_DELAY once the speaker's delay and the delivery are
+      // taken: under 100 ms, any hiccup cuts a block (stutter).
+      const ms = (s: number) => Math.round(s * 1000)
+      const margin = leads.length ? ms(Math.min(...leads)) : null
+      const out = (ctx as AudioContext & { outputLatency?: number }).outputLatency
+      return [
+        margin == null ? null : `${margin < 100 ? '⚠ ' : ''}margin ${margin} ms`,
+        `output ${ms(ctx.baseLatency || 0)}+${out == null ? '?' : ms(out)} ms`,
+        `audio ${ctx.state}, ${ctx.sampleRate / 1000} kHz`,
+        `${skipped} late blocks dropped`,
+      ]
+        .filter(Boolean)
+        .join(', ')
+    },
   }
 }
