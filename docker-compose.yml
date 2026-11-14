@@ -1,5 +1,5 @@
 # docker compose up -d --build   →   https://<this-machine-ip>:3000 on the local network
-# Public access is optional: `npm run serve -- --docker --funnel` (see docker-compose.funnel.yml).
+# Public access is optional: `./scripts/serve.sh --funnel` (see docker-compose.funnel.yml).
 services:
   tape-twist:
     build: .

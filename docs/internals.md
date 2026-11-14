@@ -35,7 +35,7 @@ How each part works, in detail. Setup is in the [README](../README.md).
   - Pads, echo and your voice aren't delayed: they play at once on each device, on top of the synced music.
 - PipeWire remembers one output per app name, and both decks are "Chromium". Each deck therefore tags its audio with `PULSE_PROP tape_twist.deck=a|b`, and the engine moves any stream that lands on the wrong sink back where it belongs.
 - `GET /api/engine-debug` shows each deck's raw player state.
-- Run `npm run start:https` from the project folder: pads are loaded from `./pads` (or `PADS_DIR`).
+- Pads are loaded from `./pads` (or `PADS_DIR`).
 
 ## Booth (effects)
 
@@ -77,7 +77,7 @@ Optional (`--funnel`, see the README). `tailscale funnel --bg https+insecure://l
 ## Docker
 
 ```sh
-npm run serve -- --docker         # rebuild + restart the container (add --funnel for the Funnel)
+./scripts/serve.sh                # rebuild + restart the container (add --funnel for the Funnel)
 docker compose up -d --build      # the same, by hand: https://<this-machine-ip>:3000, data in ./data
 docker compose logs -f            # its output
 ```

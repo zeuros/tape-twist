@@ -28,28 +28,17 @@
 
 ## 🚀 Setup
 
-**You need** either Docker (nothing else: the image brings its own sound server, ffmpeg and Chromium), or Linux with PipeWire or PulseAudio (`pactl`), `ffmpeg` with libmp3lame, and Node.js.
-
-### Option A: on this machine
+All you need is **Docker**: the image brings its own sound server, ffmpeg and Chromium.
 
 ```sh
-npm install
-npx playwright install chromium   # the hidden player decks and the login browser
-npm run serve                     # build and run on https://<this-machine-ip>:3000
+git clone https://github.com/zeuros/tape-twist.git && cd tape-twist
+./scripts/serve.sh [--funnel]     # build the image, (re)start the container, print the links
+                                  # --funnel: also public through Tailscale (see below)
 ```
 
-### Option B: in Docker
+That's it: open the printed link from any phone on the same Wi-Fi. The app stays on your local network. `./scripts/serve.sh --no-build` restarts it, `docker compose logs -f` follows it, `docker compose down` stops it. Your data (logins, playlists, PIN) stays in `./data`.
 
-```sh
-npm run serve -- --docker         # build the image, (re)start the container
-docker compose logs -f            # follow the server output
-```
-
-Both print where to open the app once it's up. It stays on your local network: phones on the same Wi-Fi join, nobody else.
-
-One container holds everything: a PulseAudio daemon for the decks, a virtual screen for the login browser, ffmpeg, Chromium, and a certificate made on first start. Your data stays in `./data`.
-
-> 💡 Ask Claude in Docker: uncomment the `~/.claude` mounts in `docker-compose.yml`. Logged in on the desktop already? Copy `data/` over.
+> 💡 Ask Claude: uncomment the `~/.claude` mounts in `docker-compose.yml`.
 
 ### First evening
 
@@ -60,11 +49,11 @@ One container holds everything: a PulseAudio daemon for the decks, a virtual scr
 
 ## 🌍 Optional: open it to the internet (Tailscale Funnel)
 
-Off by default. For phones on 4G or friends elsewhere, [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) gives the app a public address with a real certificate, `https://<machine>.<tailnet>.ts.net`. Tailscale stays on the host, Docker or not.
+Off by default. For phones on 4G or friends elsewhere, [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) gives the app a public address with a real certificate, `https://<machine>.<tailnet>.ts.net`. Tailscale runs on the host, not in the container.
 
 1. Install Tailscale on this machine, log in, and allow Funnel for it in the admin console.
 2. Run `sudo tailscale set --operator=$USER` once, so the script doesn't need sudo.
-3. Add `--funnel`: `npm run serve -- --funnel`, or `npm run serve -- --docker --funnel`.
+3. Start with `./scripts/serve.sh --funnel`.
 
 Each start turns the Funnel off and on again (an old one sometimes breaks); the start-up message and the QR code then show its address.
 
@@ -80,10 +69,9 @@ Each start turns the Funnel off and on again (an old one sometimes breaks); the 
 
 | Command | What it does |
 | --- | --- |
-| `npm run serve` | Build and serve over HTTPS on :3000 (`-- --no-build` skips the build) |
-| `npm run serve -- --docker` | Same in Docker |
-| `... --funnel` | Also publish it through the Tailscale Funnel |
-| `npm run dev:https` | Hot-reload dev server at the same address |
+| `./scripts/serve.sh` | Build and (re)start the container (`--no-build`, `--funnel`) |
+| `docker compose logs -f` / `down` | Follow it / stop it |
+| `npm run dev:https` | Hot-reload dev server (needs Node, PipeWire or PulseAudio, ffmpeg) |
 | `npm run typecheck` | Type-check the whole project |
 | `npm test` | Unit tests: sync, MP3 blocks, tempo |
 | `npm run test:e2e` | Four browsers hammering the booth for a minute |

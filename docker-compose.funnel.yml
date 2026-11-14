@@ -1,4 +1,4 @@
-# Optional, with the Tailscale Funnel on the host (`npm run serve -- --docker --funnel` adds it):
+# Optional, with the Tailscale Funnel on the host (`./scripts/serve.sh --funnel` adds it):
 # the container asks the host's tailscaled (read-only questions) for the Funnel address, shown
 # in the QR code and at start-up, and for the home's public IP (LAN redirect).
 services:

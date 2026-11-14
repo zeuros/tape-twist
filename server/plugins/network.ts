@@ -1,7 +1,7 @@
 /**
  * At start-up: print where to open the app (the dev server prints its own), and look up the
  * home's public IP so the first Funnel visitor isn't kept waiting.
- * The "Guests" line comes last: `scripts/serve.sh --docker` waits for it.
+ * The block ends with an empty line: `scripts/serve.sh` prints it from the container's logs.
  */
 export default defineNitroPlugin(() => {
   void homePublicIp()
@@ -20,7 +20,6 @@ export default defineNitroPlugin(() => {
       `   Local    ${local}/`,
       lan && `   LAN      ${home}/`,
       funnel && `   Funnel   https://${funnel}/   (public)`,
-      `   Guests   ${funnel ? `https://${funnel}/` : `${home}/`}`,
       '',
     ]
     console.log(lines.filter((l) => typeof l === 'string').join('\n'))
