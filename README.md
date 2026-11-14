@@ -78,7 +78,7 @@ Each start turns the Funnel off and on again (an old one sometimes breaks); the 
 
 ## 🧭 How it works
 
-Two hidden Chromium **decks** play Deezer and SoundCloud into virtual sound cards. The server mixes them and streams one MP3, and every phone plays sample *s* at the same server time, 0.45 s behind live.
+Two hidden Chromium **decks** play Deezer and SoundCloud into virtual sound cards. The server mixes them and streams one MP3, and every phone plays sample *s* at the same server time, 0.55 s behind live.
 
 ```
 deck A (Chromium) ──▶ tape_twist_a ──┐
