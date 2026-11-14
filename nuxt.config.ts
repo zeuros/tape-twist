@@ -21,8 +21,8 @@ export default defineNuxtConfig({
       ],
     },
   },
-  // The host page is the app: the bare address opens it.
-  routeRules: { '/': { redirect: '/player' } },
+  // The player used to live at /player: installed APKs and old QR codes still open it.
+  routeRules: { '/player': { redirect: '/' } },
   nitro: {
     // Playwright and node-web-audio-api ship native bits and must not be bundled.
     externals: { external: ['playwright', 'playwright-core', 'node-web-audio-api'] },

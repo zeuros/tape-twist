@@ -72,7 +72,7 @@ The evening list has a revision number, so two open players never silently overw
 
 ### Reaching it from outside (Tailscale Funnel)
 
-`tailscale funnel --bg https+insecure://localhost:3000` publishes the app at `https://<machine>.<tailnet>.ts.net`. Anyone with that link reaches the lock screen; the API needs the host PIN. Still, turn it off after the party (`tailscale funnel reset`). A visitor who opens the ts.net link from the home Wi-Fi is sent to the LAN address (`https://192.168.1.x:3000`) so the stream doesn't go out to the internet and back: Funnel passes the visitor's address, and the server compares it with the home's public IP from `tailscale netcheck`. Set `LAN_REDIRECT=0` to turn that off. The QR button in the player header shows the `/player` link as a QR code.
+`tailscale funnel --bg https+insecure://localhost:3000` publishes the app at `https://<machine>.<tailnet>.ts.net`. Anyone with that link reaches the lock screen; the API needs the host PIN. Still, turn it off after the party (`tailscale funnel reset`). A visitor who opens the ts.net link from the home Wi-Fi is sent to the LAN address (`https://192.168.1.x:3000`) so the stream doesn't go out to the internet and back: Funnel passes the visitor's address, and the server compares it with the home's public IP from `tailscale netcheck`. Set `LAN_REDIRECT=0` to turn that off. The QR button in the player header shows the player's link as a QR code.
 
 ## Docker
 
@@ -94,7 +94,7 @@ One container holds everything the desktop provides otherwise (`Dockerfile`, `do
 ```
 shared/types/        types used by both sides (songs and playlists, booth, engine)
 app/
-  pages/             player.vue: it only puts the components together
+  pages/             index.vue: it only puts the components together
   components/        PlatformBadge, track/ (TrackArt, TrackRow), player/ (header, search, QR link,
                      player bar), evening/ (playlists, Ask Claude, the list), booth/ (pads, holds, XY, EQ…)
   composables/       state and logic, one concern each: usePlatforms, useEvening, useEngine,

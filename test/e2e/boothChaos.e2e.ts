@@ -64,7 +64,7 @@ async function openPhone(name: string, browser: Browser, base: string, opts: { p
 }
 
 async function openPlayer(page: Page, base: string) {
-  await page.goto(`${base}/player`)
+  await page.goto(`${base}/`)
   await page.locator('nav.tabs button', { hasText: 'Booth' }).click()
   await page.locator('.pads .pad').first().waitFor()
 }

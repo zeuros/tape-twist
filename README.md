@@ -52,7 +52,7 @@ One container holds everything: a PulseAudio daemon for the decks, a virtual scr
 
 ### First evening
 
-1. **Open the player** at `https://<this-machine-ip>:3000/player` and accept the certificate warning (once per phone; HTTPS is what lets the mic work).
+1. **Open the player** at `https://<this-machine-ip>:3000` and accept the certificate warning (once per phone; HTTPS is what lets the mic work).
 2. **Enter the PIN.** It's `1234` unless you put your own in `data/host-pin` (or `HOST_PIN`); restart after changing it.
 3. **Connect** SoundCloud and Deezer. The login page shows right in the player, even on a phone: log in as usual, popups and 2FA included. Your session is saved in `data/` and refreshed by itself.
 4. **Build a playlist**, press play, and hit **Listen here** on every phone near a speaker (the QR button in the header opens the player on another phone).
@@ -67,7 +67,7 @@ One container holds everything: a PulseAudio daemon for the decks, a virtual scr
 
 ## 📲 Android app
 
-`npm run android:apk` builds a small shell (it needs JDK 21) that opens `/player` full screen, with lock-screen controls. Rebuild it only when the native shell, `capacitor.config` or the server URL changes; app updates arrive by themselves. The server offers the APK at `/tape-twist.apk`.
+`npm run android:apk` builds a small shell (it needs JDK 21) that opens the player full screen, with lock-screen controls. Rebuild it only when the native shell, `capacitor.config` or the server URL changes; app updates arrive by themselves. The server offers the APK at `/tape-twist.apk`.
 
 ## 🛠️ Commands
 

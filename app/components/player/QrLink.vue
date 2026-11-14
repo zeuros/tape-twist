@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * A small QR button; opens the /player link as a full-screen QR code to scan with a phone.
- * With Tailscale it's the short Funnel name (https://c-j.tailXXXX.ts.net/player): phones on the home
+ * A small QR button; opens the player's link as a full-screen QR code to scan with a phone.
+ * With Tailscale it's the short Funnel name (https://c-j.tailXXXX.ts.net): phones on the home
  * Wi-Fi get redirected to the LAN address by the server, the others stay on Funnel. Without it,
  * the address this page was opened on, or the LAN address when that's localhost (a phone can't
  * reach the host's "localhost").
@@ -11,10 +11,10 @@ import QRCode from 'qrcode'
 const tsHost = ref<string | null>(null)
 const lanIp = ref<string | null>(null)
 const playerUrl = computed(() => {
-  if (tsHost.value) return `https://${tsHost.value}/player`
+  if (tsHost.value) return `https://${tsHost.value}/`
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
   const host = local && lanIp.value ? `${lanIp.value}${location.port ? `:${location.port}` : ''}` : location.host
-  return `${location.protocol}//${host}/player`
+  return `${location.protocol}//${host}/`
 })
 const open = ref(false)
 const svg = ref('')
