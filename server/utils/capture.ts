@@ -1,6 +1,7 @@
 import { mkdir } from 'node:fs/promises'
 import { chromium, type BrowserContext, type Request } from 'playwright'
 import type { Platform } from '#shared/types/music'
+import { getView, openView } from './remoteView'
 import { loadCreds, profileDir, saveCreds, type Credentials } from './store'
 
 interface PlatformSpec {
@@ -52,15 +53,19 @@ export const captureState = (p: Platform) => states[p]
  * interactive=false: headless, succeeds only if the saved profile is still logged in.
  * interactive=true: visible window on the host; waits up to 5 minutes for the user to log in.
  */
-export function capture(platform: Platform, interactive: boolean): Promise<Credentials | null> {
+export function capture(platform: Platform, interactive: boolean, size?: ViewSize): Promise<Credentials | null> {
   if (running[platform]) return running[platform]!
-  const p = doCapture(platform, interactive)
+  const p = doCapture(platform, interactive, size)
     .then((c) => {
       states[platform] = { state: 'idle' }
+      getView(platform)?.end(true, 'Connected')
       return c
     })
     .catch((e: Error) => {
-      states[platform] = { state: 'error', message: e.message, at: new Date().toISOString() }
+      const message = cancelled.has(platform) ? 'Login cancelled' : e.message
+      cancelled.delete(platform)
+      states[platform] = { state: 'error', message, at: new Date().toISOString() }
+      getView(platform)?.end(false, message)
       return null
     })
     .finally(() => {
@@ -70,22 +75,52 @@ export function capture(platform: Platform, interactive: boolean): Promise<Crede
   return p
 }
 
-async function doCapture(platform: Platform, interactive: boolean): Promise<Credentials> {
+export interface ViewSize {
+  width: number
+  height: number
+  dpr: number
+}
+
+/** Login browsers open now, so the page can cancel one. */
+const contexts: Partial<Record<Platform, BrowserContext>> = {}
+const cancelled = new Set<Platform>()
+
+/** Close the login browser (the phone closed the login view). */
+export function cancelCapture(platform: Platform) {
+  const ctx = contexts[platform]
+  if (!ctx) return false
+  cancelled.add(platform)
+  void ctx.close().catch(() => {})
+  return true
+}
+
+/**
+ * A desktop to show the login window on. Without one (Docker without Xvfb, a server), the
+ * login browser runs headless and is only seen through the view in /player.
+ */
+const hasDisplay = () => !!(process.env.DISPLAY || process.env.WAYLAND_DISPLAY)
+
+async function doCapture(platform: Platform, interactive: boolean, size?: ViewSize): Promise<Credentials> {
   const spec = SPECS[platform]
   const setMsg = (message: string) => {
     states[platform] = { state: 'running', interactive, startedAt: new Date().toISOString(), message }
   }
-  setMsg(interactive ? 'Opening browser window on the host…' : 'Refreshing silently…')
+  setMsg(interactive ? 'Opening the login browser…' : 'Refreshing silently…')
 
   const dir = profileDir(platform)
   await mkdir(dir, { recursive: true })
   const previous = await loadCreds(platform)
 
+  const headless = !interactive || !hasDisplay()
+  // Shown in /player: the phone's size, so the login page fits its screen.
+  const view = interactive && size ? { width: size.width, height: size.height } : null
   const ctx: BrowserContext = await chromium.launchPersistentContext(dir, {
-    headless: !interactive,
-    viewport: interactive ? null : { width: 1280, height: 800 },
-    // Headless Chromium advertises "HeadlessChrome"; reuse the UA from the last headed login.
-    userAgent: !interactive && previous?.userAgent ? previous.userAgent : undefined,
+    headless,
+    viewport: view ?? (headless ? { width: 1280, height: 800 } : null),
+    deviceScaleFactor: view ? size!.dpr : undefined,
+    // Headless Chromium advertises "HeadlessChrome"; reuse the UA from the last headed login,
+    // or at least drop the "Headless" (login pages turn it away).
+    userAgent: headless ? (previous?.userAgent ?? (await headfulUserAgent())) : undefined,
     ignoreDefaultArgs: ['--enable-automation'],
     args: [
       '--disable-blink-features=AutomationControlled',
@@ -95,6 +130,12 @@ async function doCapture(platform: Platform, interactive: boolean): Promise<Cred
       '--password-store=basic',
     ],
   })
+
+  contexts[platform] = ctx
+  if (interactive) {
+    const v = openView(platform, ctx, size ?? { width: 1280, height: 800, dpr: 1 })
+    void v.show(ctx.pages()[0] ?? (await ctx.newPage()))
+  }
 
   let apiHeaders: Record<string, string> | null = null
   let clientId: string | undefined
@@ -144,7 +185,7 @@ async function doCapture(platform: Platform, interactive: boolean): Promise<Cred
       if (!cookie) {
         if (interactive && !sentToLogin && Date.now() - started > 4000) {
           sentToLogin = true
-          setMsg('Log in in the browser window on the host machine…')
+          setMsg('Log in in the login window…')
           await page.goto(spec.loginUrl, { waitUntil: 'domcontentloaded' }).catch(() => {})
         }
       } else {
@@ -177,6 +218,24 @@ async function doCapture(platform: Platform, interactive: boolean): Promise<Cred
     await saveCreds(platform, creds)
     return creds
   } finally {
+    delete contexts[platform]
     await ctx.close().catch(() => {})
   }
+}
+
+let defaultUA: Promise<string> | null = null
+/** The user agent of this Chromium, without "Headless". */
+function headfulUserAgent() {
+  defaultUA ??= chromium
+    .launch({ headless: true })
+    .then(async (b) => {
+      const ua = await (await b.newPage()).evaluate(() => navigator.userAgent)
+      await b.close()
+      return ua.replace('HeadlessChrome', 'Chrome')
+    })
+    .catch(() => {
+      defaultUA = null
+      return undefined as unknown as string
+    })
+  return defaultUA
 }

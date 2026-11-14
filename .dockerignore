@@ -1,0 +1,12 @@
+node_modules
+.nuxt
+.output
+.nuxt-e2e
+.output-e2e
+data
+android
+native
+.git
+.idea
+.claude
+.playwright-mcp

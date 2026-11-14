@@ -1,0 +1,19 @@
+# docker compose up -d --build   →   https://<this-machine-ip>:3000
+# Keep the Tailscale Funnel on the host (`tailscale funnel --bg https+insecure://localhost:3000`).
+services:
+  tape-twist:
+    build: .
+    # Host network: the app shows guests its LAN address (QR code), and phones reach port 3000.
+    network_mode: host
+    # Chromium (the decks, the login browser) needs a big /dev/shm.
+    shm_size: 1gb
+    environment:
+      PORT: 3000
+      # HOST_PIN: "1234"   # else data/host-pin, else 1234
+    volumes:
+      # Credentials, browser profiles, playlists, recorded pads, PIN, certificate, APK.
+      - ./data:/app/data:z   # :z lets SELinux (Fedora) allow the container to write there
+      # Ask Claude: your Claude Code login.
+      # - ~/.claude:/home/app/.claude
+      # - ~/.claude.json:/home/app/.claude.json
+    restart: unless-stopped

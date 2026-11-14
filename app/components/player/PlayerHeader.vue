@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /** Brand, and the SoundCloud / Deezer connections. */
-const { status, loginOpen, platformState, connect } = usePlatforms()
+const { status, loginOpen, loginView, platformState, connect } = usePlatforms()
+const openLogins = computed(() => PLATFORMS.filter((p) => status.value?.[p].capture.state === 'running' && status.value[p].capture.interactive))
 const { eng } = useEngine()
 </script>
 
@@ -20,7 +21,7 @@ const { eng } = useEngine()
         <button
           v-if="status?.[p]?.capture.state !== 'running'"
           class="ghost sm"
-          :title="status?.[p]?.connected ? 'Re-capture credentials from a browser login' : 'Open a browser on the host to log in'"
+          :title="status?.[p]?.connected ? 'Re-capture credentials from a browser login' : 'Log in to this platform (the server\'s browser, shown here)'"
           @click="connect(p)"
         >
           {{ status?.[p]?.connected && platformState(p).tone === 'ok' ? 'Login' : 'Connect' }}
@@ -31,7 +32,9 @@ const { eng } = useEngine()
     </div>
   </header>
 
-  <p v-if="loginOpen" class="banner">
-    A browser window opened on the machine running this app. Log in there and it closes by itself once the credentials are captured.
+  <p v-if="loginOpen && !loginView" class="banner">
+    A login is open on the server.
+    <button v-for="p in openLogins" :key="p" class="ghost sm" @click="loginView = p">Show {{ PLATFORM_LABEL[p] }} login</button>
   </p>
+  <PlayerRemoteLogin v-if="loginView" :platform="loginView" @close="loginView = null" />
 </template>

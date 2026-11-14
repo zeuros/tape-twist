@@ -31,8 +31,14 @@ export const usePlatforms = defineSingleton(() => {
     timer = setTimeout(loadStatus, busy ? 1500 : 30_000)
   }
 
+  /** The platform whose login browser is shown on this page (RemoteLogin.vue). */
+  const loginView = ref<Platform | null>(null)
+
+  /** Open the login browser on the server, sized to this screen, and show it here. */
   async function connect(p: Platform) {
-    await $fetch(`/api/connect/${p}`, { method: 'POST' })
+    const size = loginViewSize()
+    await $fetch(`/api/connect/${p}`, { method: 'POST', body: { ...size, dpr: devicePixelRatio || 1 } })
+    loginView.value = p
     loadStatus()
   }
 
@@ -67,5 +73,10 @@ export const usePlatforms = defineSingleton(() => {
   }
   const stop = () => clearTimeout(timer)
 
-  return { status, favs, favErr, favLoading, allFavs, loginOpen, loadStatus, connect, loadFavs, platformState, start, stop }
+  return { status, favs, favErr, favLoading, allFavs, loginOpen, loginView, loadStatus, connect, loadFavs, platformState, start, stop }
 })
+
+/** The login view's page size: the whole screen on a phone (under its bar), a big window on a computer. */
+export function loginViewSize() {
+  return { width: Math.min(innerWidth, 1100), height: Math.min(innerHeight, 860) - 48 }
+}

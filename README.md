@@ -27,7 +27,7 @@ The app is served over HTTPS because browsers only give the microphone (Talkover
 
 ## How credentials work
 
-- **Connect** opens a visible Chromium window **on the machine running the server** (it uses a saved profile in `data/profiles/<platform>`). You log in yourself. The app waits for the session cookie (`oauth_token` for SoundCloud, `arl` for Deezer), records the headers the site sends to its own API (plus SoundCloud's `client_id`), saves them to `data/credentials-<platform>.json`, and closes the window.
+- **Connect** opens a Chromium on the server (with a saved profile in `data/profiles/<platform>`) and **shows it in the page**, sized to your screen: its tab is streamed as JPEG frames (Chrome's screencast, only when the page changes) and your taps, scrolls and typing are replayed into it (`server/utils/remoteView.ts`, `app/components/player/RemoteLogin.vue`). So you can log in from a phone, anywhere, and the server needs no screen (Docker). On a desktop the same window also opens there. Deezer and SoundCloud can't be put in an iframe, and a page couldn't read their cookies anyway: the capture has to happen on the server. You log in yourself (captcha, 2FA and Google/Apple popups included: a popup takes over the view until it closes). The app waits for the session cookie (`oauth_token` for SoundCloud, `arl` for Deezer), records the headers the site sends to its own API (plus SoundCloud's `client_id`), saves them to `data/credentials-<platform>.json`, and closes the browser. ✕ cancels.
 - API calls replay those captured headers, cookies and user agent:
   - SoundCloud: `api-v2.soundcloud.com` (`/me`, `track_likes`, `playlist_likes`)
   - Deezer: `www.deezer.com/ajax/gw-light.php` (`deezer.getUserData`, `song.getFavoriteIds`, `song.getListData`, and `deezer.pageSearch` for catalog search)
@@ -98,6 +98,19 @@ Guests get a cookie ID, with no account needed. Asking for a track that's alread
 ### Reaching it from outside (Tailscale Funnel)
 
 `tailscale funnel --bg https+insecure://localhost:3000` publishes the app at `https://<machine>.<tailnet>.ts.net`. Anyone with that link reaches the guest page; `/player` and its API need the host PIN. Still, turn it off after the party (`tailscale funnel reset`). A visitor who opens the ts.net link from the home Wi-Fi is sent to the LAN address (`https://192.168.1.x:3000`) so the stream doesn't go out to the internet and back: Funnel passes the visitor's address, and the server compares it with the home's public IP from `tailscale netcheck`. Set `LAN_REDIRECT=0` to turn that off. The QR button in the player header shows the `/player` link as a QR code.
+
+## Docker
+
+```sh
+docker compose up -d --build      # https://<this-machine-ip>:3000, data in ./data
+```
+
+One container holds everything the desktop provides otherwise (`Dockerfile`, `docker/entrypoint.sh`): a PulseAudio daemon for the decks' virtual sinks (nothing plays on the host), Xvfb as the login browser's invisible screen (you see it through **Connect**, above), ffmpeg, Playwright's Chromium, and a self-signed certificate created in `data/tls` on first start. It uses the host network, so guests get the LAN address and phones reach port 3000, and a 1 GB `/dev/shm` for Chromium.
+
+- **Tailscale:** keep the Funnel on the host (`tailscale funnel --bg https+insecure://localhost:3000`). There's no `tailscale` inside, so the QR code shows the LAN address and the LAN redirect is off.
+- **Ask Claude:** mount your Claude Code login (`~/.claude`, `~/.claude.json`; commented out in `docker-compose.yml`). Build with `--build-arg WITH_CLAUDE=0` to leave the CLI out.
+- **Already logged in on a desktop?** Copy `data/` over: credentials and profiles work as they are.
+- The container runs as uid 1000, normally the owner of `./data`.
 
 ## Project layout
 
