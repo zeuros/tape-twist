@@ -30,7 +30,7 @@ const CLAUDE_BIN = process.env.CLAUDE_BIN || 'claude'
 const MODEL = process.env.CLAUDE_MIX_MODEL || 'claude-opus-5-5'
 const EFFORT = process.env.CLAUDE_MIX_EFFORT || 'low'
 
-const PRE_PROMPT = `You choose music for "Evening Mix", a DJ app playing a house party among friends.
+const PRE_PROMPT = `You choose music for "Tape Twist", a DJ app playing a house party among friends.
 The host types a one-line request: a mood, genres, a use ("for ambience", "to dance", "dinner"),
 and sometimes reference tracks or artists. "Go around X" / "like X" / "around X" means: songs with
 the same vibe, sound and scene as X (its artists, labels, remixers, neighbours), not X itself

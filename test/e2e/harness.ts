@@ -4,7 +4,7 @@
  * tapped (see INSTRUMENT), so a test can tell what each "phone" actually plays.
  *
  * Isolation from a server running on the same machine: its own port, data folder
- * (a temporary one), build folders and sinks (EVENING_SINKS=evening_e2e).
+ * (a temporary one), build folders and sinks (TAPE_TWIST_SINKS=tape_twist_e2e).
  */
 import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -15,7 +15,7 @@ import { promisify } from 'node:util'
 
 const run = promisify(execFile)
 const ROOT = resolve(import.meta.dirname, '../..')
-export const SINK_PREFIX = 'evening_e2e'
+export const SINK_PREFIX = 'tape_twist_e2e'
 /** The browsers play into this null sink: nothing reaches the speakers, timing stays real. */
 export const OUT_SINK = `${SINK_PREFIX}_out`
 export const BPM = 124
@@ -70,8 +70,8 @@ export async function startServer(port: number): Promise<TestServer> {
       PORT: String(port),
       DATA_DIR: dataDir,
       PADS_DIR: join(ROOT, 'pads'),
-      EVENING_E2E: '1',
-      EVENING_SINKS: SINK_PREFIX,
+      TAPE_TWIST_E2E: '1',
+      TAPE_TWIST_SINKS: SINK_PREFIX,
       LAN_REDIRECT: '0',
     },
     stdio: ['ignore', 'pipe', 'pipe'],

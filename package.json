@@ -1,5 +1,5 @@
 {
-  "name": "evening-mix",
+  "name": "tape-twist",
   "version": "1.0.0",
   "scripts": {
     "dev": "nuxt dev --host 0.0.0.0",
@@ -9,9 +9,9 @@
     "start:https": "NITRO_SSL_CERT=\"$(cat data/tls/cert.pem)\" NITRO_SSL_KEY=\"$(cat data/tls/key.pem)\" HOST=0.0.0.0 PORT=3000 node .output/server/index.mjs",
     "typecheck": "nuxt typecheck",
     "postinstall": "nuxt prepare",
-    "cert": "mkdir -p data/tls && openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj /CN=evening-mix -keyout data/tls/key.pem -out data/tls/cert.pem",
+    "cert": "mkdir -p data/tls && openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj /CN=tape-twist -keyout data/tls/key.pem -out data/tls/cert.pem",
     "test": "vitest run",
-    "test:e2e": "EVENING_E2E=1 nuxt build && vitest run -c vitest.e2e.config.ts",
+    "test:e2e": "TAPE_TWIST_E2E=1 nuxt build && vitest run -c vitest.e2e.config.ts",
     "serve": "scripts/serve.sh"
   },
   "type": "module",

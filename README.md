@@ -1,4 +1,4 @@
-# Evening Mix
+# Tape Twist
 
 Browse your SoundCloud and Deezer favorites in one searchable list, arrange evening playlists with start times, and play it with crossfades. The server does the playing; any phone or laptop on the LAN is the remote and can listen to the live stream.
 
@@ -37,12 +37,12 @@ The app is served over HTTPS because browsers only give the microphone (Talkover
 
 ```
  Deezer / SoundCloud                 virtual sinks             ffmpeg            phone
- deck A (hidden Chromium) ──audio──▶ evening_mix_a ─┐
+ deck A (hidden Chromium) ──audio──▶ tape_twist_a ──┐
                                                     ├─ Node mix → MP3 ──▶ /api/stream ──▶ phone: + pads, colour, echo, EQ (Web Audio)
- deck B (hidden Chromium) ──audio──▶ evening_mix_b ─┘
+ deck B (hidden Chromium) ──audio──▶ tape_twist_b ──┘
 ```
 
-- Each **deck** is a headless Chromium whose sound goes to its own virtual sink (`evening_mix_a` / `_b`), so nothing plays through the PC's speakers.
+- Each **deck** is a headless Chromium whose sound goes to its own virtual sink (`tape_twist_a` / `_b`), so nothing plays through the PC's speakers.
   - Deezer plays in a deezer.com page through its own player (`dzPlayer`), logged in with the captured cookies, so you get full tracks.
   - SoundCloud plays through the official widget API.
 - **Crossfades:** the next item is preloaded on the idle deck. When the current item is `crossfade` seconds from its end, the two sinks are ramped with equal-power curves. Deezer→Deezer can't overlap (one stream per account), so it fades out, then in, on the same deck.
@@ -55,7 +55,7 @@ The app is served over HTTPS because browsers only give the microphone (Talkover
   - Tested in one machine: Chromium pages (MP3 and PCM) within ~10–20 ms of each other; Firefox (PCM) syncs too. On phones over Wi-Fi expect ~10–30 ms.
   - **Sync slider** (next to Listen, per device, remembered): plays that device earlier (or later), for speakers that add their own delay. Bluetooth speakers are often 100–300 ms late: drag until the speakers sound as one. Double-click resets it.
   - Pads, echo and your voice aren't delayed: they play at once on each device, on top of the synced music.
-- PipeWire remembers one output per app name, and both decks are "Chromium". Each deck therefore tags its audio with `PULSE_PROP evening.deck=a|b`, and the engine moves any stream that lands on the wrong sink back where it belongs.
+- PipeWire remembers one output per app name, and both decks are "Chromium". Each deck therefore tags its audio with `PULSE_PROP tape_twist.deck=a|b`, and the engine moves any stream that lands on the wrong sink back where it belongs.
 - `GET /api/engine-debug` shows each deck's raw player state.
 - Run `npm run start:https` from the project folder: pads are loaded from `./pads` (or `PADS_DIR`).
 
@@ -126,7 +126,7 @@ installed) and the Web Audio block scheduler.
 ## Tests
 
 - `npm test`: unit tests of the plain TypeScript parts (sync, MP3 blocks, tempo).
-- `npm run test:e2e`: four phones messing with the booth for a minute. It builds into `.output-e2e`, starts the server on port 3190 with a temporary data folder and its own PipeWire sinks (`evening_e2e_*`, removed afterwards), plays a 124 BPM test beat into deck A, and opens four browsers that listen: Chrome (MP3 through MSE), Chrome on the iPhone path (MP3 decoded in the page), Firefox, and Chrome behind a 4G-like link (30–80 ms, plus a hiccup of up to 220 ms every few seconds). Each page's audio output is tapped. They hammer pads, holds, stutter, XY, colour, EQ, lights and Listen, then it checks that no hold stays stuck, every phone still plays its music without dropouts, every pad (also a newly added one) plays on every phone, and the light show only starts on phones that were listening. Safe next to a running server. `E2E_CHAOS_SEC=20` shortens the chaos; `E2E_SEED` replays one (printed at the start).
+- `npm run test:e2e`: four phones messing with the booth for a minute. It builds into `.output-e2e`, starts the server on port 3190 with a temporary data folder and its own PipeWire sinks (`tape_twist_e2e_*`, removed afterwards), plays a 124 BPM test beat into deck A, and opens four browsers that listen: Chrome (MP3 through MSE), Chrome on the iPhone path (MP3 decoded in the page), Firefox, and Chrome behind a 4G-like link (30–80 ms, plus a hiccup of up to 220 ms every few seconds). Each page's audio output is tapped. They hammer pads, holds, stutter, XY, colour, EQ, lights and Listen, then it checks that no hold stays stuck, every phone still plays its music without dropouts, every pad (also a newly added one) plays on every phone, and the light show only starts on phones that were listening. Safe next to a running server. `E2E_CHAOS_SEC=20` shortens the chaos; `E2E_SEED` replays one (printed at the start).
 
 ## Notes
 

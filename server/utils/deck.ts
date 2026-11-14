@@ -11,7 +11,7 @@ export interface DeckState {
   ended: boolean
 }
 
-const SC_DECK_URL = 'https://evening-mix.invalid/deck'
+const SC_DECK_URL = 'https://tape-twist.invalid/deck'
 const SC_DECK_HTML = `<!doctype html><html><body>
 <div id="host"></div>
 <script src="https://w.soundcloud.com/player/api.js"></script>
@@ -103,7 +103,7 @@ export class Deck {
       headless: true,
       channel: 'chromium',
       // PULSE_PROP tags this deck's audio streams so enforceRouting() can find them.
-      env: { ...process.env, PULSE_SINK: this.sink, PULSE_PROP: `evening.deck=${deckTag(this.sink)}` },
+      env: { ...process.env, PULSE_SINK: this.sink, PULSE_PROP: `tape_twist.deck=${deckTag(this.sink)}` },
       // Playwright mutes headless browsers by default.
       ignoreDefaultArgs: ['--mute-audio'],
       args: ['--autoplay-policy=no-user-gesture-required', '--disable-blink-features=AutomationControlled'],
