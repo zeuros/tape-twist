@@ -87,14 +87,20 @@ export const useEngine = defineSingleton(() => {
   watch(
     () => eng.value?.current?.id,
     () => {
-      if (!('mediaSession' in navigator)) return
       const c = eng.value?.current
+      nativeMeta(c?.title, c?.artist)
+      if (!('mediaSession' in navigator)) return
       navigator.mediaSession.metadata = c
         ? new MediaMetadata({ title: c.title, artist: c.artist, artwork: c.artwork ? [{ src: c.artwork }] : [] })
         : null
     },
   )
   function setupMediaSession() {
+    onNativeMediaAction((a) => {
+      if (a === 'play') void (eng.value?.status === 'paused' ? command('resume') : togglePlay())
+      else if (a === 'pause') command('pause')
+      else command(a)
+    })
     if (!('mediaSession' in navigator)) return
     const ms = navigator.mediaSession
     ms.setActionHandler('play', () => (eng.value?.status === 'paused' ? command('resume') : togglePlay()))

@@ -26,6 +26,7 @@ const { eng } = useEngine()
           {{ status?.[p]?.connected && platformState(p).tone === 'ok' ? 'Login' : 'Connect' }}
         </button>
       </div>
+      <PlayerApkLink />
       <PlayerGuestQr />
     </div>
   </header>
