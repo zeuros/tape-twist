@@ -7,6 +7,19 @@
 }
 @media (min-width: 861px) and (max-width: 1199px) {
   .side { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  /* Not enough room for the sync note: it stays in the tooltip of the sync value. */
+  .xfade .sync-note { display: none; }
+}
+
+/* Desktop: the player bar keeps one line whether listening or not; the controls on the right
+   take the room they need and "now playing" gives way. */
+@media (min-width: 861px) {
+  .remote-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .extras { flex-wrap: nowrap; }
+  .xfade input { width: 90px; }
+  .xfade.ahead { flex-wrap: nowrap; }
+  .xfade.ahead span { min-width: 6.5em; font-variant-numeric: tabular-nums; }
+  .xfade .sync-note { flex-basis: auto; max-width: 9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 
 @media (max-width: 860px) {
