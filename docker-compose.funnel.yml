@@ -1,7 +1,8 @@
-# Optional, with the Tailscale Funnel on the host (`./scripts/serve.sh --funnel` adds it):
-# the container asks the host's tailscaled (read-only questions) for the Funnel address, shown
-# in the QR code and at start-up, and for the home's public IP (LAN redirect).
+# Optional, with the Tailscale Funnel on the host (`./scripts/serve.sh --funnel` adds it).
+# There's no Tailscale in the container: the script reads the Funnel address and the home's
+# public IP on the host and passes them here (start-up links, QR code, LAN redirect).
 services:
   tape-twist:
-    volumes:
-      - /var/run/tailscale/tailscaled.sock:/var/run/tailscale/tailscaled.sock
+    environment:
+      FUNNEL_HOST: ${FUNNEL_HOST:-}
+      HOME_PUBLIC_IP: ${HOME_PUBLIC_IP:-}

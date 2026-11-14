@@ -42,6 +42,8 @@ export async function lanOrigin(): Promise<string | null> {
  */
 let publicIp: { value: Promise<string | null>; at: number } | null = null
 export function homePublicIp(): Promise<string | null> {
+  // In Docker there's no tailscale: scripts/serve.sh --funnel passes what the host's says.
+  if (process.env.HOME_PUBLIC_IP !== undefined) return Promise.resolve(process.env.HOME_PUBLIC_IP || null)
   if (!publicIp || Date.now() - publicIp.at > 10 * 60_000) {
     const value = run('tailscale', ['netcheck', '--format=json'], { timeout: 15_000 })
       .then(({ stdout }) => {
@@ -60,6 +62,7 @@ export function homePublicIp(): Promise<string | null> {
  */
 let funnel: { value: Promise<string | null>; at: number } | null = null
 export function funnelHost(): Promise<string | null> {
+  if (process.env.FUNNEL_HOST !== undefined) return Promise.resolve(process.env.FUNNEL_HOST || null)
   if (!funnel || Date.now() - funnel.at > 30_000) {
     const value = run('tailscale', ['funnel', 'status', '--json'], { timeout: 10_000 })
       .then(({ stdout }) => {

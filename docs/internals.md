@@ -84,7 +84,7 @@ docker compose logs -f            # its output
 
 One container holds everything the desktop provides otherwise (`Dockerfile`, `docker/entrypoint.sh`): a PulseAudio daemon for the decks' virtual sinks (nothing plays on the host), Xvfb as the login browser's invisible screen (you see it through **Connect**, above), ffmpeg, Playwright's Chromium, and a self-signed certificate created in `data/tls` on first start. It uses the host network, so the QR code gets the LAN address and phones reach port 3000, and a 1 GB `/dev/shm` for Chromium.
 
-- **Tailscale:** the Funnel stays on the host. The image only has the `tailscale` command; `docker-compose.funnel.yml` (added by `--funnel`) mounts the host's `tailscaled.sock`, so the container can read the Funnel address and the home's public IP. Without it the QR code shows the LAN address and the LAN redirect is off.
+- **Tailscale:** the Funnel stays on the host; there's no Tailscale in the image. `./scripts/serve.sh --funnel` reads the Funnel address and the home's public IP on the host and passes them to the container (`FUNNEL_HOST`, `HOME_PUBLIC_IP`, through `docker-compose.funnel.yml`). Without them the QR code shows the LAN address and the LAN redirect is off. (Mounting the host's `tailscaled.sock` instead is blocked by SELinux on Fedora.)
 - **Ask Claude:** mount your Claude Code login (`~/.claude`, `~/.claude.json`; commented out in `docker-compose.yml`). Build with `--build-arg WITH_CLAUDE=0` to leave the CLI out.
 - **Already logged in on a desktop?** Copy `data/` over: credentials and profiles work as they are.
 - The container runs as uid 1000, normally the owner of `./data`.
