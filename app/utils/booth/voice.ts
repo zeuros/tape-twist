@@ -2,7 +2,7 @@ import type { VoicePreset } from '#shared/types/booth'
 import { biquad, funfairReverb, gainNode, wav } from './dsp'
 
 /**
- * The booth voice: your mic (Talkover, this device only) or a recorded pad, cleaned up
+ * The booth voice: your mic (Talkover, also sent to the other devices) or a recorded pad, cleaned up
  * (low cut, presence, compressor), through a voice character (tannoy / robot / chipmunk /
  * monster), then a slapback and a funfair reverb.
  *
@@ -125,7 +125,7 @@ function pitchShifter(ctx: BaseAudioContext, semitones: number) {
 
 /**
  * Talkover voice on this device: the mic, opened on the first press and kept open until
- * listening stops, through the voice chain into `out`. A feedback detector notches larsen.
+ * listening stops, through the voice chain into `out` (and `bus`, sent to the other devices). A feedback detector notches larsen.
  */
 export class VoiceChannel {
   private head: GainNode
@@ -143,6 +143,10 @@ export class VoiceChannel {
   private held = false
   private fbTimer: ReturnType<typeof setInterval> | undefined
   private fbCandidate = { bin: -1, count: 0 }
+  /** The whole voice (room included), also sent to the other devices (app/utils/voiceLink.ts). */
+  readonly bus: GainNode
+  /** Told when the voice opens (true) and closes (false), to send it while open. */
+  onOpen: (open: boolean) => void = () => {}
 
   constructor(private ctx: AudioContext, out: AudioNode) {
     this.head = gainNode(ctx)
@@ -163,7 +167,9 @@ export class VoiceChannel {
       v.output.connect(this.presetGains[p])
     }
     presetsOut.connect(this.gate).connect(this.level)
-    ;({ slapOut: this.slapOut, verbOut: this.verbOut } = tannoyRoom(ctx, this.level, out))
+    this.bus = gainNode(ctx)
+    this.bus.connect(out)
+    ;({ slapOut: this.slapOut, verbOut: this.verbOut } = tannoyRoom(ctx, this.level, this.bus))
     // Larsen watch: looks at the voice before the presets (a shifted pitch would put the
     // notch on the wrong frequency). Only read while Talkover is held.
     this.analyser = ctx.createAnalyser()
@@ -197,6 +203,7 @@ export class VoiceChannel {
     }
     const open = this.held && !!this.micSrc
     this.glide(this.gate.gain, open ? 1 : 0, open ? 0.01 : 0.06)
+    this.onOpen(open)
     clearInterval(this.fbTimer)
     if (open) this.fbTimer = setInterval(() => this.watchFeedback(), 50)
   }
@@ -216,6 +223,7 @@ export class VoiceChannel {
 
   closeMic() {
     this.held = false
+    this.onOpen(false)
     clearInterval(this.fbTimer)
     this.gate.gain.value = 0
     this.micSrc?.disconnect()

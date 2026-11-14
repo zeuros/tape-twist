@@ -168,10 +168,12 @@ export const useBooth = defineSingleton(() => {
 
   async function start() {
     connect()
+    voiceLink.start() // opened now, so a Talkover press never waits for it
     await reloadPads()
   }
   function stop() {
     events?.close()
+    voiceLink.stop()
     for (const t of Object.values(holdTimers)) clearInterval(t)
   }
 

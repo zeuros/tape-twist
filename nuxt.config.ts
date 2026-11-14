@@ -24,6 +24,8 @@ export default defineNuxtConfig({
   // The player used to live at /player: installed APKs and old QR codes still open it.
   routeRules: { '/player': { redirect: '/' } },
   nitro: {
+    // Talkover on every device: server/routes/api/voice.ts.
+    experimental: { websocket: true },
     // Playwright and node-web-audio-api ship native bits and must not be bundled.
     externals: { external: ['playwright', 'playwright-core', 'node-web-audio-api'] },
     ...(e2e ? { output: { dir: '.output-e2e' } } : {}),

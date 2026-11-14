@@ -81,6 +81,7 @@ export const useListening = defineSingleton(() => {
       useBooth().attach(audio)
     }
     void audio.resume()
+    audio.setRemoteVoice(true)
     listening.value = true
     audioState.value = 'connecting'
     const opts = {
@@ -112,6 +113,7 @@ export const useListening = defineSingleton(() => {
     detail.value = ''
     audio?.stopPads()
     audio?.closeMic()
+    audio?.setRemoteVoice(false)
     audio?.keepAlive(false)
     nativePlaying(false)
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none'

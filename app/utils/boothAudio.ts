@@ -13,7 +13,7 @@
  *      └─ colour ─▶ wet (+noise)┘                └─▶ kick meter (light show)
  *
  *   fx context:                          pads ─▶ pad gain ─────────────────────────┬─▶ limiter ─▶ out
- *   mic (talkover, this device only) ─▶ voice chain (app/utils/booth/voice.ts) ─────┘
+ *   mic (talkover, also sent to the others) ─▶ voice chain (app/utils/booth/voice.ts) ─────┘
  */
 
 import type { ColorPreset, Eq, VoicePreset, XY } from '#shared/types/booth'
@@ -21,6 +21,13 @@ import { biquad, dbToGain, driveCurve, gainNode, noiseBuffer, softLimitCurve } f
 import { measureRoom } from './booth/autoSync'
 import { VoiceChannel } from './booth/voice'
 import { MusicPitch } from './booth/pitch'
+import { voiceLink } from './voiceLink'
+import voiceWorkletUrl from '../workers/voice.worklet.ts?worker&url'
+
+/** Talkover keeps sending this long after release: the reverb's tail. */
+const VOICE_TAIL_MS = 1500
+/** The other devices' Talkover, louder than this device's own voice (it comes over the music). */
+const REMOTE_VOICE_DB = 9
 
 export interface PadInfo {
   id: string
@@ -111,6 +118,8 @@ export class BoothAudio {
 
   /** Talkover mic, mixed on this device only, after the duck. */
   private talk: VoiceChannel
+  /** The other devices' Talkover (app/utils/voiceLink.ts). */
+  private remoteGain: GainNode
 
   private padBuffers = new Map<string, Promise<AudioBuffer | null>>()
   private voices = new Map<string, AudioBufferSourceNode>()
@@ -262,6 +271,40 @@ export class BoothAudio {
     fxOut.connect(gain(0.5, fx)).connect(fxLimiter).connect(fx.destination)
 
     this.talk = new VoiceChannel(fx, fxOut)
+    this.remoteGain = gain(0, fx)
+    this.remoteGain.connect(fxOut)
+    void this.linkVoices(fxOut)
+  }
+
+  /**
+   * Talkover on every device (app/utils/voiceLink.ts): this device's voice goes out while it's
+   * open (plus the reverb's tail), the others' voices come in, mixed like this device's own.
+   */
+  private async linkVoices(fxOut: GainNode) {
+    const fx = this.fx
+    try {
+      await fx.audioWorklet.addModule(voiceWorkletUrl)
+    } catch {
+      return // no AudioWorklet: the voice stays on this device
+    }
+    const capture = new AudioWorkletNode(fx, 'voice-capture', { numberOfOutputs: 1, outputChannelCount: [1] })
+    this.talk.bus.connect(capture)
+    capture.connect(gainNode(fx, 0)).connect(fx.destination) // pulled by the graph
+    capture.port.onmessage = (e: MessageEvent<ArrayBuffer>) => voiceLink.send(e.data)
+    let tail: ReturnType<typeof setTimeout> | undefined
+    this.talk.onOpen = (open) => {
+      clearTimeout(tail)
+      if (open) capture.port.postMessage(true)
+      else tail = setTimeout(() => capture.port.postMessage(false), VOICE_TAIL_MS)
+    }
+    const player = new AudioWorkletNode(fx, 'voice-player', { numberOfInputs: 0, outputChannelCount: [1] })
+    player.connect(this.remoteGain)
+    voiceLink.setSink((buf) => player.port.postMessage(buf, [buf]))
+  }
+
+  /** The other devices' Talkover is heard while this device listens. */
+  setRemoteVoice(on: boolean) {
+    this.glide(this.remoteGain.gain, on ? dbToGain(REMOTE_VOICE_DB) : 0, 0.05, this.fx)
   }
 
   resume() {
