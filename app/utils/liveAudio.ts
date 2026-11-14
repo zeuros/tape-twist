@@ -1,5 +1,5 @@
-import { MPEGDecoder } from 'mpg123-decoder'
-import { BLOCK, mp3Reader, type RawBlock } from './pcmBlocks'
+import type { StreamOut } from '../workers/mp3Stream'
+import { BLOCK } from './pcmBlocks'
 import { createScheduler } from './pcmScheduler'
 import { ServerClock } from './serverClock'
 
@@ -10,8 +10,8 @@ import { ServerClock } from './serverClock'
  * page measures the offset between its clock and the server's (like NTP, serverClock.ts), and
  * every device plays sample s at the same server time: anchor + s/SR + delay.
  *
- * The page fetches the MP3 itself and decodes it (mpg123 in WebAssembly, pcmBlocks.ts) into
- * 0.1 s blocks, each scheduled with Web Audio at the context time matching its shared server
+ * A worker fetches the MP3 and decodes it (mpg123 in WebAssembly, pcmBlocks.ts, off the main
+ * thread: app/workers/mp3Stream.ts) into 0.1 s blocks, each scheduled with Web Audio at the context time matching its shared server
  * time (pcmScheduler.ts), on every browser. (The browser's own MP3 player, fed through Media
  * Source Extensions, could only be steered from outside: it stuttered on Android when the
  * stream ran late.) `ahead` (seconds, per device) plays this device earlier, for speakers
@@ -50,12 +50,10 @@ export interface LiveOptions {
 export type Trouble = 'stream' | 'dead'
 
 export function playLive(ctx: AudioContext, dest: AudioNode, url: string, onTrouble: (why: Trouble) => void, opts: LiveOptions): LiveAudio {
-  const abort = new AbortController()
   const clock = new ServerClock()
   void clock.start()
   let stopped = false
   let epoch: number | null = null
-  const decoder = new MPEGDecoder()
   const mapping: number[] = [] // recent (performance ms − context ms) readings
   let lastMapAt = -Infinity
 
@@ -125,35 +123,25 @@ export function playLive(ctx: AudioContext, dest: AudioNode, url: string, onTrou
     },
   })
 
-  const play = (blocks: RawBlock[]) => {
-    for (const { ch, s } of blocks) {
+  const play = (blocks: { l: Float32Array; r: Float32Array; s: number }[]) => {
+    for (const { l, r, s } of blocks) {
       if (stopped) return
       const buf = new AudioBuffer({ numberOfChannels: 2, length: BLOCK, sampleRate: 48000 })
-      buf.copyToChannel(ch[0] as Float32Array<ArrayBuffer>, 0)
-      buf.copyToChannel(ch[1] as Float32Array<ArrayBuffer>, 1)
+      buf.copyToChannel(l as Float32Array<ArrayBuffer>, 0)
+      buf.copyToChannel(r as Float32Array<ArrayBuffer>, 1)
       scheduler.push(buf, s)
     }
   }
 
-  void (async () => {
-    try {
-      await decoder.ready
-      if (stopped) return
-      const res = await fetch(url, { signal: abort.signal, cache: 'no-store' })
-      if (!res.ok || !res.body) throw new Error(`stream ${res.status}`)
-      const start = Number(res.headers.get('x-stream-start'))
-      epoch = Number(res.headers.get('x-stream-epoch'))
-      const read = mp3Reader(start, decoder)
-      const reader = res.body.getReader()
-      for (;;) {
-        const { done, value } = await reader.read()
-        if (done) throw new Error('stream ended')
-        play(read(value))
-      }
-    } catch {
-      trouble('stream')
-    }
-  })()
+  const worker = new Worker(new URL('../workers/mp3Stream.ts', import.meta.url), { type: 'module' })
+  worker.onmessage = (e: MessageEvent<StreamOut>) => {
+    const m = e.data
+    if (m.type === 'start') epoch = m.epoch
+    else if (m.type === 'blocks') play(m.blocks)
+    else trouble('stream')
+  }
+  worker.onerror = () => trouble('stream')
+  worker.postMessage({ url: new URL(url, location.href).href })
 
   return {
     stop() {
@@ -161,9 +149,8 @@ export function playLive(ctx: AudioContext, dest: AudioNode, url: string, onTrou
       clearInterval(watchdog)
       ctx.removeEventListener('statechange', onState)
       clock.stop()
-      abort.abort()
+      worker.terminate()
       scheduler.stop()
-      decoder.free()
     },
     lag: () => (clock.info ? clock.info.delay - opts.ahead() : null),
     sync: () => {
