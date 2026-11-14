@@ -5,7 +5,7 @@ Browse your SoundCloud and Deezer favorites in one searchable list, arrange even
 Requires Linux with PipeWire or PulseAudio (`pactl`) and `ffmpeg` with libmp3lame.
 
 - **Guests:** `https://<this-machine-ip>:3000/`. They can search your favorites and the whole SoundCloud and Deezer catalogs, request tracks and vote.
-- **Player:** `https://<this-machine-ip>:3000/player`. Open to anyone on the LAN, no PIN (it's meant for friends).
+- **Player:** `https://<this-machine-ip>:3000/player`. Asks for the host PIN once per device: `HOST_PIN`, else the content of `data/host-pin` (private, not in git), else `1234`. Restart after changing it; a cookie remembers it. A wrong PIN blocks every try for 10 s. Without the PIN, the server refuses every `/api` call except the guest ones (`/api/guest/*`). Anyone can read the front-end code, routes included: the server is what checks.
 
 ```sh
 # once

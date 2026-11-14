@@ -157,3 +157,13 @@
 /* The sync note (a failed auto-sync, the sync source) gets its own line, leaving the slider its width */
 .xfade.ahead { flex-wrap: wrap; }
 .xfade .sync-note { flex-basis: 100%; white-space: normal; }
+
+/* ------------------------------------------------------- PIN lock */
+.pin-gate { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; }
+.pin-gate .logo { width: 96px; color: var(--text); margin-bottom: 8px; }
+.pin-gate label { color: var(--muted); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+.pin-gate input { width: min(220px, 100%); text-align: center; font-size: 28px; letter-spacing: .3em; padding: 10px; border-radius: var(--radius); border: 0; background: var(--well); box-shadow: var(--well-shadow); color: var(--text); }
+.pin-gate .primary { width: min(220px, 100%); height: 48px; border-radius: 999px; }
+.pin-gate .primary:disabled { opacity: .5; box-shadow: none; }
+.pin-msg { min-height: 1.4em; margin: 0; color: var(--bad); }
+.pin-gate a { color: var(--muted); font-size: 14px; }

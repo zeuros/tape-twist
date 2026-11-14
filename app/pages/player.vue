@@ -11,8 +11,16 @@ const listen = useListening()
 const { pending } = useRequests()
 
 const tab = ref<'favs' | 'evening' | 'booth' | 'requests'>('favs')
+/** Host PIN entered on this device? null while checking (nothing mounts or fetches until it's known). */
+const unlocked = ref<boolean | null>(null)
+const pinLength = ref(4)
 
 onMounted(async () => {
+  const auth = await $fetch<{ ok: boolean; length: number }>('/api/auth').catch(() => null)
+  if (auth?.length) pinLength.value = auth.length
+  unlocked.value = !!auth?.ok
+  if (!unlocked.value) return
+  await nextTick() // the panels mount now
   await platforms.start()
   await loadEvening()
   engine.start()
@@ -29,7 +37,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="shell">
+  <PlayerPinGate v-if="unlocked === false" :length="pinLength" />
+  <div v-else-if="unlocked" class="shell">
     <PlayerHeader />
 
     <nav class="tabs">
