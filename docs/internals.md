@@ -74,19 +74,19 @@ Guests get a cookie ID, with no account needed. Asking for a track that's alread
 
 ### Reaching it from outside (Tailscale Funnel)
 
-`tailscale funnel --bg https+insecure://localhost:3000` publishes the app at `https://<machine>.<tailnet>.ts.net`. Anyone with that link reaches the guest page; `/player` and its API need the host PIN. Still, turn it off after the party (`tailscale funnel reset`). A visitor who opens the ts.net link from the home Wi-Fi is sent to the LAN address (`https://192.168.1.x:3000`) so the stream doesn't go out to the internet and back: Funnel passes the visitor's address, and the server compares it with the home's public IP from `tailscale netcheck`. Set `LAN_REDIRECT=0` to turn that off. The QR button in the player header shows the `/player` link as a QR code.
+Optional (`--funnel`, see the README). `tailscale funnel --bg https+insecure://localhost:3000` publishes the app at `https://<machine>.<tailnet>.ts.net`. Anyone with that link reaches the guest page; `/player` and its API need the host PIN. Still, turn it off after the party (`tailscale funnel reset`). A visitor who opens the ts.net link from the home Wi-Fi is sent to the LAN address (`https://192.168.1.x:3000`) so the stream doesn't go out to the internet and back: Funnel passes the visitor's address, and the server compares it with the home's public IP from `tailscale netcheck`. Set `LAN_REDIRECT=0` to turn that off. The QR button in the player header shows the `/player` link as a QR code: the Funnel one while `tailscale funnel status` says it's on (`funnelHost()` in `server/utils/network.ts`), else the LAN one. The same addresses are printed at start-up (`server/plugins/network.ts`).
 
 ## Docker
 
 ```sh
-npm run serve -- --docker         # rebuild + restart the container, then cycle the Funnel
-docker compose up -d --build      # the same without the Funnel: https://<this-machine-ip>:3000, data in ./data
+npm run serve -- --docker         # rebuild + restart the container (add --funnel for the Funnel)
+docker compose up -d --build      # the same, by hand: https://<this-machine-ip>:3000, data in ./data
 docker compose logs -f            # its output
 ```
 
 One container holds everything the desktop provides otherwise (`Dockerfile`, `docker/entrypoint.sh`): a PulseAudio daemon for the decks' virtual sinks (nothing plays on the host), Xvfb as the login browser's invisible screen (you see it through **Connect**, above), ffmpeg, Playwright's Chromium, and a self-signed certificate created in `data/tls` on first start. It uses the host network, so guests get the LAN address and phones reach port 3000, and a 1 GB `/dev/shm` for Chromium.
 
-- **Tailscale:** keep the Funnel on the host (`npm run serve -- --docker` handles it). There's no `tailscale` inside, so the QR code shows the LAN address and the LAN redirect is off.
+- **Tailscale:** the Funnel stays on the host. The image only has the `tailscale` command; `docker-compose.funnel.yml` (added by `--funnel`) mounts the host's `tailscaled.sock`, so the container can read the Funnel address and the home's public IP. Without it the QR code shows the LAN address and the LAN redirect is off.
 - **Ask Claude:** mount your Claude Code login (`~/.claude`, `~/.claude.json`; commented out in `docker-compose.yml`). Build with `--build-arg WITH_CLAUDE=0` to leave the CLI out.
 - **Already logged in on a desktop?** Copy `data/` over: credentials and profiles work as they are.
 - The container runs as uid 1000, normally the owner of `./data`.

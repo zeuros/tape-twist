@@ -36,20 +36,21 @@
 ```sh
 npm install
 npx playwright install chromium   # the hidden player decks and the login browser
-npm run serve                     # build, run on https://<this-machine-ip>:3000, start the Funnel
+npm run serve                     # build and run on https://<this-machine-ip>:3000
 ```
 
 ### Option B: in Docker
 
 ```sh
-npm run serve -- --docker         # build the image, (re)start the container, start the Funnel
+npm run serve -- --docker         # build the image, (re)start the container
 docker compose logs -f            # follow the server output
 ```
 
+Both print where to open the app once it's up. It stays on your local network: phones on the same Wi-Fi join, nobody else.
+
 One container holds everything: a PulseAudio daemon for the decks, a virtual screen for the login browser, ffmpeg, Chromium, and a certificate made on first start. Your data stays in `./data`.
 
-> 💡 For Ask Claude in Docker, uncomment the `~/.claude` mounts in `docker-compose.yml`.
-> Already logged in on the desktop? Copy `data/` over and it just works.
+> 💡 Ask Claude in Docker: uncomment the `~/.claude` mounts in `docker-compose.yml`. Logged in on the desktop already? Copy `data/` over.
 
 ### First evening
 
@@ -59,13 +60,19 @@ One container holds everything: a PulseAudio daemon for the decks, a virtual scr
 4. **Build a playlist**, press play, and hit **Listen here** on every phone near a speaker.
 5. **Share the guest link** (QR button in the header) so friends can request songs.
 
-## 🌍 Reaching it from outside
+## 🌍 Optional: open it to the internet (Tailscale Funnel)
 
-`npm run serve` publishes the app through **Tailscale Funnel** at `https://<machine>.<tailnet>.ts.net`, turning it off and on again at each start (an old Funnel sometimes breaks).
+Off by default. For guests on 4G or friends elsewhere, [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) gives the app a public address with a real certificate, `https://<machine>.<tailnet>.ts.net`. Tailscale stays on the host, Docker or not.
+
+1. Install Tailscale on this machine, log in, and allow Funnel for it in the admin console.
+2. Run `sudo tailscale set --operator=$USER` once, so the script doesn't need sudo.
+3. Add `--funnel`: `npm run serve -- --funnel`, or `npm run serve -- --docker --funnel`.
+
+Each start turns the Funnel off and on again (an old one sometimes breaks); the start-up message and the QR code then show its address.
 
 - Guests reach the guest page; `/player` and its API need the PIN, and a wrong PIN blocks every try for 10 s.
-- Visitors on your home Wi-Fi are sent to the LAN address, so the stream doesn't go out to the internet and back (`LAN_REDIRECT=0` turns that off).
-- Run `sudo tailscale set --operator=$USER` once so it stops asking for sudo, and `tailscale funnel reset` after the party.
+- Visitors on your home Wi-Fi are sent to the LAN address, so the stream doesn't go out and back (`LAN_REDIRECT=0` turns that off).
+- The Funnel stays on after the server stops: `tailscale funnel reset` after the party.
 
 ## 📲 Android app
 
@@ -75,8 +82,9 @@ One container holds everything: a PulseAudio daemon for the decks, a virtual scr
 
 | Command | What it does |
 | --- | --- |
-| `npm run serve` | Build, serve over HTTPS on :3000, cycle the Funnel (`-- --no-build` skips the build) |
+| `npm run serve` | Build and serve over HTTPS on :3000 (`-- --no-build` skips the build) |
 | `npm run serve -- --docker` | Same in Docker |
+| `... --funnel` | Also publish it through the Tailscale Funnel |
 | `npm run dev:https` | Hot-reload dev server at the same address |
 | `npm run typecheck` | Type-check the whole project |
 | `npm test` | Unit tests: sync, MP3 blocks, tempo |

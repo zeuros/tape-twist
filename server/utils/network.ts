@@ -54,17 +54,21 @@ export function homePublicIp(): Promise<string | null> {
   return publicIp.value
 }
 
-/** This machine's Tailscale name (e.g. c-j.tail1234.ts.net), the address Funnel publishes; null without Tailscale. */
-let tsHost: Promise<string | null> | null = null
-export function tailscaleHost(): Promise<string | null> {
-  tsHost ??= run('tailscale', ['status', '--json'], { timeout: 10_000 })
-    .then(({ stdout }) => {
-      const name = (JSON.parse(stdout) as { Self?: { DNSName?: string } }).Self?.DNSName ?? ''
-      return name.replace(/\.$/, '') || null
-    })
-    .catch(() => {
-      tsHost = null // try again next time
-      return null
-    })
-  return tsHost
+/**
+ * The public Funnel name (e.g. c-j.tail1234.ts.net) while `tailscale funnel` is on, else null
+ * (no Tailscale, or the Funnel is off: the app is LAN-only then). Checked again after 30 s.
+ */
+let funnel: { value: Promise<string | null>; at: number } | null = null
+export function funnelHost(): Promise<string | null> {
+  if (!funnel || Date.now() - funnel.at > 30_000) {
+    const value = run('tailscale', ['funnel', 'status', '--json'], { timeout: 10_000 })
+      .then(({ stdout }) => {
+        const on = (JSON.parse(stdout) as { AllowFunnel?: Record<string, boolean> }).AllowFunnel ?? {}
+        const key = Object.keys(on).find((k) => on[k])
+        return key ? key.replace(/:443$/, '') : null
+      })
+      .catch(() => null)
+    funnel = { value, at: Date.now() }
+  }
+  return funnel.value
 }

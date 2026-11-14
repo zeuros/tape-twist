@@ -18,6 +18,9 @@ RUN npm ci \
  && npm run build \
  && npm prune --omit=dev
 
+# Only the tailscale command (no daemon): with docker-compose.funnel.yml it talks to the host's.
+COPY --from=tailscale/tailscale:v1.102.5 /usr/local/bin/tailscale /usr/local/bin/tailscale
+
 # Optional: "Ask Claude" runs the Claude Code CLI with your login (mount ~/.claude, see compose).
 ARG WITH_CLAUDE=1
 RUN if [ "$WITH_CLAUDE" = 1 ]; then npm install -g @anthropic-ai/claude-code; fi
