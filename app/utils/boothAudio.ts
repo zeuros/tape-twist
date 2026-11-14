@@ -28,11 +28,12 @@ export interface PadInfo {
 }
 
 /**
- * Output buffer of the music context, in seconds. 'interactive' (~10–20 ms) crackled for a
- * couple of seconds when a phone was locked; this leaves room for that hiccup. The sync
- * accounts for it (outputLatency()).
+ * Output buffer of the music context, in seconds. Chromium's whole output delay grows with it
+ * (desktop: 0.06 → 61 + 240 ms, 0.02 → 21 + 136 ms) and comes out of SYNC_DELAY's margin, so
+ * keep it small. 'interactive' (~10 ms) crackled for a couple of seconds when a phone was locked;
+ * 0.02 leaves room for that hiccup. Firefox ignores it. The sync accounts for it (outputLatency).
  */
-const MUSIC_LATENCY = 0.06
+const MUSIC_LATENCY = 0.02
 const EQ_MIN = -26 // slider bottom = kill (-40 dB)
 const ECHO_DELAY = 0.375
 const ECHO_FEEDBACK = 0.55
