@@ -123,6 +123,11 @@ server/
 `test/`): stream decoding and sample numbering (with the real ffmpeg encoder when it is
 installed) and the Web Audio block scheduler.
 
+## Tests
+
+- `npm test`: unit tests of the plain TypeScript parts (sync, MP3 blocks, tempo).
+- `npm run test:e2e`: four phones messing with the booth for a minute. It builds into `.output-e2e`, starts the server on port 3190 with a temporary data folder and its own PipeWire sinks (`evening_e2e_*`, removed afterwards), plays a 124 BPM test beat into deck A, and opens four browsers that listen: Chrome (MP3 through MSE), Chrome on the iPhone path (MP3 decoded in the page), Firefox, and Chrome behind a 4G-like link (30–80 ms, plus a hiccup of up to 220 ms every few seconds). Each page's audio output is tapped. They hammer pads, holds, stutter, XY, colour, EQ, lights and Listen, then it checks that no hold stays stuck, every phone still plays its music without dropouts, every pad (also a newly added one) plays on every phone, and the light show only starts on phones that were listening. Safe next to a running server. `E2E_CHAOS_SEC=20` shortens the chaos; `E2E_SEED` replays one (printed at the start).
+
 ## Notes
 
 - Deezer may substitute a newer ID for an older favorite (same song). The deck accepts the match by ID or by title.

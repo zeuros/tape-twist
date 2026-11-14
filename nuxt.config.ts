@@ -1,5 +1,9 @@
+// The end-to-end tests build into their own folders, so they never touch a running server's build.
+const e2e = process.env.EVENING_E2E === '1'
+
 export default defineNuxtConfig({
   compatibilityDate: '2026-11-01',
+  ...(e2e ? { buildDir: '.nuxt-e2e' } : {}),
   ssr: false,
   devtools: { enabled: false },
   css: ['~/assets/css/base.css', '~/assets/css/player.css', '~/assets/css/booth.css', '~/assets/css/responsive.css', '~/assets/css/guest.css'],
@@ -19,5 +23,6 @@ export default defineNuxtConfig({
   nitro: {
     // Playwright and node-web-audio-api ship native bits and must not be bundled.
     externals: { external: ['playwright', 'playwright-core', 'node-web-audio-api'] },
+    ...(e2e ? { output: { dir: '.output-e2e' } } : {}),
   },
 })

@@ -3,8 +3,12 @@ import { promisify } from 'node:util'
 
 const run = promisify(execFile)
 
-/** Virtual PipeWire/PulseAudio sinks, one per deck. Nothing reaches the real speakers. */
-export const SINKS = ['evening_mix_a', 'evening_mix_b'] as const
+/**
+ * Virtual PipeWire/PulseAudio sinks, one per deck. Nothing reaches the real speakers.
+ * EVENING_SINKS renames them (the end-to-end tests use their own, next to a running server).
+ */
+const SINK_PREFIX = process.env.EVENING_SINKS || 'evening_mix'
+export const SINKS = [`${SINK_PREFIX}_a`, `${SINK_PREFIX}_b`] as const
 export type SinkName = (typeof SINKS)[number]
 
 export async function ensureSinks() {

@@ -1,4 +1,4 @@
-import { enforceRouting, ensureSinks } from './audio'
+import { enforceRouting, ensureSinks, SINKS } from './audio'
 import { Deck, type DeckState } from './deck'
 import { EQ_MIN, mixer } from './mixer'
 import { DEFAULT_ENGINE_SETTINGS, type EngineSettings, type EngineSnapshot, type EngineStatus } from '#shared/types/engine'
@@ -15,7 +15,7 @@ const CLOSE_DECKS_AFTER = 15 * 60_000
  * auto-advance run one at a time through `serial`; a manual command interrupts a fade.
  */
 class Engine {
-  private decks = [new Deck('evening_mix_a'), new Deck('evening_mix_b')]
+  private decks = SINKS.map((s) => new Deck(s))
   private active = 0
   private serial: Promise<unknown> = Promise.resolve()
   private abortFade = false

@@ -4,3 +4,5 @@ node_modules
 data
 .idea
 .playwright-mcp
+.nuxt-e2e
+.output-e2e
