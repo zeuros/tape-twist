@@ -12,18 +12,23 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY . .
-RUN npm ci \
- && npx playwright install --with-deps chromium \
- && npm run build \
- && npm prune --omit=dev
 
+# Layers from the least to the most often changed, so a code change only rebuilds the app.
 # Only the tailscale command (no daemon): with docker-compose.funnel.yml it talks to the host's.
 COPY --from=tailscale/tailscale:v1.102.5 /usr/local/bin/tailscale /usr/local/bin/tailscale
 
 # Optional: "Ask Claude" runs the Claude Code CLI with your login (mount ~/.claude, see compose).
 ARG WITH_CLAUDE=1
 RUN if [ "$WITH_CLAUDE" = 1 ]; then npm install -g @anthropic-ai/claude-code; fi
+
+# Dependencies and Chromium: downloaded again only when package*.json change. The project's own
+# postinstall (nuxt prepare) needs the sources, and `nuxt build` does it anyway: skipped here.
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts && npm rebuild
+RUN npx playwright install --with-deps chromium
+
+COPY . .
+RUN npm run build
 
 # Runs as uid 1000, usually the host user owning ./data.
 RUN useradd -m -u 1000 -o app && mkdir -p /app/data && chown app /app/data
