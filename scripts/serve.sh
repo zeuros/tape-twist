@@ -14,13 +14,13 @@ fi
 [[ -f data/tls/cert.pem ]] || npm run cert
 [[ "${1:-}" == --no-build ]] || npm run build
 
-# The funnel is kept by tailscaled itself (--bg): set once, it survives restarts and reboots.
+# The funnel is kept by tailscaled itself (--bg), but a funnel left from the last run sometimes
+# fails once the server is back, so each start turns it off and on again.
 # sudo is only needed while this user isn't the Tailscale operator
 # (`sudo tailscale set --operator=$USER` once removes it).
-if ! tailscale funnel status 2>/dev/null | grep -q 'localhost:3000'; then
-  tailscale funnel --bg --yes https+insecure://localhost:3000 2>/dev/null \
-    || sudo tailscale funnel --bg --yes https+insecure://localhost:3000
-fi
+ts() { tailscale "$@" 2>/dev/null || sudo tailscale "$@"; }
+ts funnel --https=443 off >/dev/null || true # nothing to turn off on the first run
+ts funnel --bg --yes https+insecure://localhost:3000 >/dev/null
 tailscale funnel status | grep -E '^https://' || true
 
 exec npm run start:https
