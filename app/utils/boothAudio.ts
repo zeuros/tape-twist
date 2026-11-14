@@ -123,7 +123,12 @@ export class BoothAudio {
    * blocks are scheduled into `musicIn` (app/utils/liveAudio.ts).
    */
   constructor() {
-    const ctx = (this.ctx = new AudioContext({ latencyHint: MUSIC_LATENCY }))
+    // At the stream's own rate: the browser then resamples once, at the output, if the phone's
+    // speaker runs at 44.1 kHz, instead of each 0.1 s block on its own (a seam every block).
+    // Not in Firefox: it won't connect the mic (auto-sync) to a context at another rate than the
+    // device's, and it plays the blocks seamlessly already.
+    const firefox = /firefox/i.test(navigator.userAgent)
+    const ctx = (this.ctx = new AudioContext({ latencyHint: MUSIC_LATENCY, ...(firefox ? {} : { sampleRate: 48000 }) }))
     const fx = (this.fx = new AudioContext({ latencyHint: 'interactive' }))
     const gain = (v = 1, c: BaseAudioContext = ctx) => gainNode(c, v)
     // The music comes in here, as scheduled blocks of the decoded stream.

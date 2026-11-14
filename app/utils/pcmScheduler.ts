@@ -5,7 +5,8 @@
  */
 
 export const PCM_JUMP = 0.03 // s of error fixed by rescheduling instead of the rate
-export const PCM_DEADBAND = 0.002
+/** Errors under this are left alone: every rate change starts a new resampler (a seam). */
+export const PCM_DEADBAND = 0.005
 export const PCM_MAX_RATE = 0.005 // ±0.5 %: inaudible
 /** Unsynced (no shared clock yet): start this far ahead of now. */
 export const UNSYNCED_LEAD = 0.3
@@ -13,6 +14,7 @@ export const UNSYNCED_LEAD = 0.3
 /** The bits of AudioContext the scheduler uses (a fake in tests). */
 export interface SchedulerContext {
   readonly currentTime: number
+  readonly sampleRate: number
   createBufferSource(): AudioBufferSourceNode
 }
 
@@ -46,6 +48,9 @@ export function createScheduler(ctx: SchedulerContext, dest: AudioNode, hooks: S
 
   const startBlock = (b: Block, t: number, rate: number) => {
     const now = ctx.currentTime
+    // On a whole sample frame: a start between two frames is rounded by the browser, separately
+    // from where the previous block ends (a one-sample hole or overlap: a click).
+    t = Math.round(t * ctx.sampleRate) / ctx.sampleRate
     const dur = b.buf.duration / rate
     b.t = t
     b.end = t + dur

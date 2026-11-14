@@ -10,6 +10,7 @@ function fakeCtx() {
   const started: { at: number; offset?: number; rate: number; stopped: boolean }[] = []
   const ctx = {
     currentTime: 0,
+    sampleRate: SR,
     createBufferSource() {
       const rec = { at: NaN, offset: undefined as number | undefined, rate: 1, stopped: false }
       return {
@@ -56,6 +57,14 @@ describe('createScheduler', () => {
     near(started.map((x) => x.at), [0, 1, 2, 3].map((i) => 2 + i * DUR))
     expect(started.every((x) => x.rate === 1)).toBe(true)
     expect(Math.abs(s.lastError()!)).toBeLessThan(1e-9)
+  })
+
+  it('starts blocks on whole sample frames', () => {
+    const { ctx, started } = fakeCtx()
+    const s = createScheduler(ctx, dest, { idealTime: (n) => 2.0000123 + n / SR })
+    for (let i = 0; i < 3; i++) s.push(buf, i * BLOCK)
+    for (const x of started) expect(Math.abs(x.at * SR - Math.round(x.at * SR))).toBeLessThan(1e-6)
+    expect(started[0]!.at * SR).toBeCloseTo(96001, 6) // 2.0000123 s = frame 96000.59
   })
 
   it('steers a small drift with a capped playback rate', () => {
