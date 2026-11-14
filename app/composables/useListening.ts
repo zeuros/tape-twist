@@ -1,4 +1,4 @@
-import type { LiveAudio, SyncInfo } from '~/utils/liveAudio'
+import type { LiveAudio, SyncInfo, Trouble } from '~/utils/liveAudio'
 
 /**
  * "Listen here": plays the live mix on this device, in sync with every other listening
@@ -55,6 +55,10 @@ export const useListening = defineSingleton(() => {
     noteTimer = setTimeout(() => (autoSync.value.note = ''), 10000)
   }
 
+  const detail = ref('')
+  /** The sync note's tooltip: the label, plus the audio path's health (PCM path). */
+  const syncTitle = computed(() => [syncLabel.value, detail.value].filter(Boolean).join(' · '))
+
   const syncLabel = computed(() => {
     if (!listening.value) return ''
     const s = syncInfo.value
@@ -62,14 +66,26 @@ export const useListening = defineSingleton(() => {
     return `in sync ±${Math.max(1, Math.round(Math.abs(s.errorMs) + s.rttMs / 2))} ms`
   })
 
-  function start() {
+  let rebuild = false // the audio context broke: make a new one on the next start
+  /**
+   * `fromTap`: pressed by hand. On the PCM path (Firefox, iPhones) that also rebuilds the audio
+   * contexts, like a page refresh would: one can break for good (no sound while "listening").
+   */
+  function start(fromTap = false) {
     if (!el) return
+    const mse = lowLatencySupported()
+    live?.stop()
+    live = null
+    if (audio && !mse && (fromTap || rebuild)) {
+      audio.close()
+      audio = null
+    }
+    rebuild = false
     if (!audio) {
-      audio = new BoothAudio(el) // inside the tap: browsers only start audio after a gesture
+      audio = new BoothAudio(mse ? el : null) // inside the tap: browsers only start audio after a gesture
       useBooth().attach(audio)
     }
     void audio.resume()
-    live?.stop()
     listening.value = true
     audioState.value = 'connecting'
     const opts = {
@@ -81,7 +97,6 @@ export const useListening = defineSingleton(() => {
     // Web Audio where it can't (Firefox, iPhones). Both play in sync.
     // The PCM path also runs an inaudible keep-alive media element: otherwise Firefox on
     // Android suspends the page when the screen goes off (see BoothAudio.keepAlive).
-    const mse = lowLatencySupported()
     audio.keepAlive(!mse)
     live = mse
       ? playLive(el, `/api/stream?t=${Date.now()}`, onTrouble, opts)
@@ -92,6 +107,7 @@ export const useListening = defineSingleton(() => {
     lagTimer = setInterval(() => {
       lag.value = live?.lag() ?? null
       syncInfo.value = live?.sync() ?? null
+      detail.value = live?.detail?.() ?? ''
     }, 1000)
   }
 
@@ -103,6 +119,7 @@ export const useListening = defineSingleton(() => {
     live?.stop()
     live = null
     syncInfo.value = null
+    detail.value = ''
     audio?.stopPads()
     audio?.closeMic()
     audio?.keepAlive(false)
@@ -110,12 +127,13 @@ export const useListening = defineSingleton(() => {
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none'
   }
 
-  /** The stream broke (network, server restart): reconnect in 2 s. */
-  function onTrouble() {
+  /** The stream broke (network, server restart), or the audio context did: reconnect in 2 s. */
+  function onTrouble(why?: Trouble | Event) {
     if (!listening.value) return
+    if (why === 'dead') rebuild = true
     audioState.value = 'connecting'
     clearTimeout(retryTimer)
-    retryTimer = setTimeout(start, 2000)
+    retryTimer = setTimeout(() => start(), 2000)
   }
 
   /** Back from the lock screen: wake the audio up if the browser paused it anyway. */
@@ -132,5 +150,5 @@ export const useListening = defineSingleton(() => {
     audio = null
   }
 
-  return { listening, audioState, lag, ahead, setAhead, autoSync, runAutoSync, syncLabel, setElement, getAudio, start, stop, onTrouble, onVisible, close }
+  return { listening, audioState, lag, ahead, setAhead, autoSync, runAutoSync, syncLabel, syncTitle, setElement, getAudio, start, stop, onTrouble, onVisible, close }
 })

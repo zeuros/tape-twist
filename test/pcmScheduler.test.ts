@@ -85,12 +85,14 @@ describe('createScheduler', () => {
 
   it('skips blocks that are already over and plays the rest of a partly late one', () => {
     const { ctx, started } = fakeCtx()
-    const s = createScheduler(ctx, dest, { idealTime: (n) => n / SR })
+    const placed: boolean[] = []
+    const s = createScheduler(ctx, dest, { idealTime: (n) => n / SR, onBlock: (p) => placed.push(p) })
     ctx.currentTime = 0.15
     s.push(buf, 0) // 0 → 0.1: over
     s.push(buf, BLOCK) // 0.1 → 0.2: half heard
     expect(started).toHaveLength(1)
     expect(started[0]!.at).toBe(0.15)
     expect(started[0]!.offset).toBeCloseTo(0.05)
+    expect(placed).toEqual([false, true]) // the watchdog counts the dropped one
   })
 })

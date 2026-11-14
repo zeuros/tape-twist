@@ -116,14 +116,18 @@ export class BoothAudio {
   private talkover = false
   private echoHeld = false
 
-  /** Call from a tap (browsers only start audio after a user gesture). */
-  constructor(el: HTMLAudioElement) {
+  /**
+   * Call from a tap (browsers only start audio after a user gesture). `el` is the <audio> element
+   * of the MP3 path; none on the PCM path (blocks go into `musicIn`), so that one can be thrown
+   * away and rebuilt (an element can only ever be connected to one context).
+   */
+  constructor(el: HTMLAudioElement | null) {
     const ctx = (this.ctx = new AudioContext({ latencyHint: MUSIC_LATENCY }))
     const fx = (this.fx = new AudioContext({ latencyHint: 'interactive' }))
     const gain = (v = 1, c: BaseAudioContext = ctx) => gainNode(c, v)
     // The music comes in here: from the element (MP3 stream), or as scheduled PCM blocks.
     const src = (this.musicIn = gain())
-    ctx.createMediaElementSource(el).connect(src)
+    if (el) ctx.createMediaElementSource(el).connect(src)
 
     // Tape stop: a delay whose length grows ever faster slows the music down to a standstill
     // (and lowers its pitch with it); shrinking it back to 0 plays catch-up, then it's live again.

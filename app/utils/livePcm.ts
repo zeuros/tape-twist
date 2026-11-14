@@ -1,5 +1,5 @@
 import { MPEGDecoder } from 'mpg123-decoder'
-import type { LiveAudio, LiveOptions } from './liveAudio'
+import type { LiveAudio, LiveOptions, Trouble } from './liveAudio'
 import { BLOCK, mp3Reader, pcmReader, type RawBlock } from './pcmBlocks'
 import { createScheduler } from './pcmScheduler'
 import { ServerClock } from './serverClock'
@@ -10,8 +10,13 @@ import { ServerClock } from './serverClock'
  * into 0.1 s blocks, and each block is scheduled at the context time matching its shared
  * server time (app/utils/pcmScheduler.ts). Without WebAssembly the server's raw PCM is used
  * instead (~1.5 Mbit/s rather than 0.2).
+ *
+ * A watchdog keeps it audible: a suspended context is resumed; when every block arrives already
+ * over (the context/server clock link went wrong) the link is measured again; and when that
+ * doesn't help, or the context's clock stands still while "running" (its output died, Firefox
+ * on Android after an output change), it reports 'dead' so the page rebuilds the context.
  */
-export function playPcm(ctx: AudioContext, dest: AudioNode, url: string, onTrouble: () => void, opts: LiveOptions): LiveAudio {
+export function playPcm(ctx: AudioContext, dest: AudioNode, url: string, onTrouble: (why: Trouble) => void, opts: LiveOptions): LiveAudio {
   const abort = new AbortController()
   const clock = new ServerClock()
   void clock.start()
@@ -43,10 +48,48 @@ export function playPcm(ctx: AudioContext, dest: AudioNode, url: string, onTroub
     return ctx.currentTime + (perfMs - performance.now()) / 1000 - (c2.outputLatency || 0) - (ctx.baseLatency || 0)
   }
 
+  // ------------------------------------------------------------ watchdog
+  let skippedInRow = 0 // blocks dropped as already over, since the last one played
+  let skipped = 0
+  let relinked = false // the clock link was measured again for the current run of drops
+  let lastCt = ctx.currentTime
+  let frozen = 0 // seconds the context's clock stood still while running
+  const trouble = (why: Trouble) => {
+    if (!stopped) onTrouble(why)
+  }
+  const onState = () => {
+    mapping.length = 0 // its clock may have jumped
+    if (!stopped && ctx.state !== 'running' && ctx.state !== 'closed') void ctx.resume().catch(() => {})
+  }
+  ctx.addEventListener('statechange', onState)
+  const watchdog = setInterval(() => {
+    if (stopped) return
+    if (ctx.state !== 'running') return onState()
+    frozen = ctx.currentTime === lastCt ? frozen + 1 : 0
+    lastCt = ctx.currentTime
+    if (frozen >= 3) return trouble('dead')
+    if (skippedInRow >= 20) {
+      // 2 s of audio dropped in a row: measure the link again once, then give up on this context.
+      if (relinked) return trouble('dead')
+      relinked = true
+      skippedInRow = 0
+      mapping.length = 0
+    }
+  }, 1000)
+
   const scheduler = createScheduler(ctx, dest, {
     idealTime,
     onUnsynced: () => epoch != null && clock.refresh(),
     onPlaying: opts.onPlaying,
+    onBlock: (played) => {
+      if (played) {
+        skippedInRow = 0
+        relinked = false
+      } else {
+        skipped++
+        skippedInRow++
+      }
+    },
   })
 
   const play = (blocks: RawBlock[]) => {
@@ -76,13 +119,15 @@ export function playPcm(ctx: AudioContext, dest: AudioNode, url: string, onTroub
         play(read(value))
       }
     } catch {
-      if (!stopped) onTrouble()
+      trouble('stream')
     }
   })()
 
   return {
     stop() {
       stopped = true
+      clearInterval(watchdog)
+      ctx.removeEventListener('statechange', onState)
       clock.stop()
       abort.abort()
       scheduler.stop()
@@ -93,6 +138,7 @@ export function playPcm(ctx: AudioContext, dest: AudioNode, url: string, onTroub
       const e = scheduler.lastError()
       return e == null ? null : { errorMs: e * 1000, rttMs: clock.rtt }
     },
+    detail: () => `audio ${ctx.state}, ${skipped} late blocks dropped`,
   }
 }
 

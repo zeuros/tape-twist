@@ -39,7 +39,12 @@ export interface LiveAudio {
   lag(): number | null
   /** Sync state, or null while not synced. */
   sync(): SyncInfo | null
+  /** Health of the audio path, for the sync note's tooltip (PCM path only). */
+  detail?(): string
 }
+
+/** Why a stream gave up. 'dead': the audio context itself is broken, rebuild it before retrying. */
+export type Trouble = 'stream' | 'dead'
 
 export interface LiveOptions {
   /** Called when sound starts. */

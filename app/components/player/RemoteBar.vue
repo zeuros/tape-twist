@@ -2,7 +2,7 @@
 /** The floating player bar: progress, now playing, transport, crossfade, Listen here, sync. */
 const { eng, busy, command, loadingItem, togglePlay, shownPos, setCrossfade } = useEngine()
 const listen = useListening()
-const { listening, audioState, lag, ahead, syncLabel, setAhead, autoSync } = listen
+const { listening, audioState, lag, ahead, syncLabel, syncTitle, setAhead, autoSync } = listen
 const { evening } = useEvening()
 const num = (e: Event) => Number((e.target as HTMLInputElement).value)
 
@@ -124,7 +124,7 @@ function seekCancel() {
           class="listen"
           :class="audioState"
           :title="listening ? `Stop listening on this device (${syncLabel}${lag != null ? `, ${lag.toFixed(1)} s behind the server` : ''})` : 'Play the evening on this device, in sync with the other listening devices'"
-          @click="listening ? listen.stop() : listen.start()"
+          @click="listening ? listen.stop() : listen.start(true)"
         >
           {{ audioState === 'on' ? '🔊 Listening' : audioState === 'connecting' ? '… Connecting' : '🎧 Listen here' }}
         </button>
@@ -143,7 +143,7 @@ function seekCancel() {
           >
             <i v-if="autoSync.busy" class="spin" /><template v-else>🎯 Auto</template>
           </button>
-          <small v-if="autoSync.note || syncLabel" class="sync-note" :title="autoSync.note || syncLabel">{{ autoSync.note || syncLabel }}</small>
+          <small v-if="autoSync.note || syncLabel" class="sync-note" :title="autoSync.note || syncTitle">{{ autoSync.note || syncLabel }}</small>
         </label>
       </div>
     </div>
