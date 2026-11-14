@@ -1,9 +1,16 @@
 <script setup lang="ts">
-/** Talkover and Brake work while held; Echo out is a tap. */
-const { booth, held, holdStart, holdEnd, echoOut } = useBooth()
-const { eng } = useEngine()
+/** Hold buttons: they act while pressed, on every listening device. */
+const { booth, held, holdStart, holdEnd } = useBooth()
 
-function down(name: 'talkover' | 'brake', e: PointerEvent) {
+type Name = 'talkover' | 'brake' | 'rewind' | 'build'
+const HOLDS: { name: Name; emoji: string; label: string; title: string }[] = [
+  { name: 'talkover', emoji: '🎙️', label: 'Talkover', title: "Hold: the music drops and your voice (this device's mic) plays with reverb" },
+  { name: 'brake', emoji: '🛑', label: 'Brake', title: 'Hold: the music slows down to a stop like a turntable; let go to spin it back up' },
+  { name: 'rewind', emoji: '⏪', label: 'Rewind', title: 'Hold: the music spins backwards, faster and faster; let go to drop back in' },
+  { name: 'build', emoji: '🚀', label: 'Build-up', title: 'Hold: the bass fades away, a riser and a snare roll climb for four bars; let go for the drop' },
+]
+
+function down(name: Name, e: PointerEvent) {
   capturePointer(e)
   holdStart(name)
 }
@@ -12,29 +19,17 @@ function down(name: 'talkover' | 'brake', e: PointerEvent) {
 <template>
   <div class="holds">
     <button
+      v-for="h in HOLDS"
+      :key="h.name"
       class="hold"
-      :class="{ on: held.talkover || booth.talkover }"
-      title="Hold: the music drops and your voice (this device's mic) plays with reverb"
-      @pointerdown.prevent="down('talkover', $event)"
-      @pointerup="holdEnd('talkover')"
-      @pointercancel="holdEnd('talkover')"
+      :class="{ on: held[h.name] || booth[h.name] }"
+      :title="h.title"
+      @pointerdown.prevent="down(h.name, $event)"
+      @pointerup="holdEnd(h.name)"
+      @pointercancel="holdEnd(h.name)"
       @contextmenu.prevent
     >
-      🎙️ <span>Talkover</span><small>hold</small>
-    </button>
-    <button class="hold" title="Echo the current track out and bring in the next one" :disabled="eng?.status !== 'playing'" @click="echoOut">
-      🌀⏭ <span>Echo out</span><small>tap</small>
-    </button>
-    <button
-      class="hold"
-      :class="{ on: held.brake || booth.brake }"
-      title="Hold: the music slows down to a stop like a turntable; let go to spin it back up"
-      @pointerdown.prevent="down('brake', $event)"
-      @pointerup="holdEnd('brake')"
-      @pointercancel="holdEnd('brake')"
-      @contextmenu.prevent
-    >
-      🛑 <span>Brake</span><small>hold</small>
+      {{ h.emoji }} <span>{{ h.label }}</span><small>hold</small>
     </button>
   </div>
 </template>

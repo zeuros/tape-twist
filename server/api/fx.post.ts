@@ -1,10 +1,9 @@
 import type { ColorPreset } from '#shared/types/booth'
 import { booth, COLORS } from '../utils/booth'
-import { engine } from '../utils/engine'
 import { mixer } from '../utils/mixer'
 
 interface FxCommand {
-  action: 'eq' | 'color' | 'duck' | 'padVolume' | 'talkover' | 'echo' | 'brake' | 'xy' | 'echoOut' | 'pad' | 'stopPads'
+  action: 'eq' | 'color' | 'duck' | 'padVolume' | 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'stutter' | 'lights' | 'xy' | 'pad' | 'stopPads'
   eq?: { low?: number; mid?: number; high?: number }
   color?: ColorPreset
   value?: number
@@ -37,11 +36,11 @@ export default defineEventHandler(async (event) => {
     case 'talkover': booth.hold('talkover', !!c.on, from); break
     case 'echo': booth.hold('echo', !!c.on, from); break
     case 'brake': booth.hold('brake', !!c.on, from); break
+    case 'rewind': booth.hold('rewind', !!c.on, from); break
+    case 'build': booth.hold('build', !!c.on, from); break
+    case 'stutter': booth.setStutter(c.on === false ? null : Number(c.value), from); break
+    case 'lights': booth.setLights(!!c.on, from); break
     case 'xy': booth.setXY(c.on === false ? null : { x: num(c.x, 0, 1), y: num(c.y, 0, 1) }, from); break
-    case 'echoOut':
-      booth.echoOut(from)
-      await engine.echoOut()
-      break
     case 'pad':
       if (c.on !== false && !mixer.listenerCount) {
         throw createError({ statusCode: 409, statusMessage: 'Nobody is listening: tap "Listen here" first' })

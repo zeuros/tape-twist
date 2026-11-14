@@ -51,5 +51,6 @@ onBeforeUnmount(() => {
     </main>
 
     <PlayerRemoteBar />
+    <BoothLightShow />
   </div>
 </template>

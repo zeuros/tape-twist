@@ -11,6 +11,7 @@ import {
 } from 'node-web-audio-api'
 import { SINKS, type SinkName } from './audio'
 import { MP3_ENCODE_ARGS } from './mp3'
+import { TempoTracker } from './tempo'
 
 /**
  * Live mixer, a Web Audio graph rendered natively (node-web-audio-api, Rust):
@@ -47,9 +48,10 @@ const MAX_QUEUE = BUF + 14400 // past this, skip ahead to PREFILL (clock drift, 
 /**
  * How far behind the server every synced phone plays: also the lag of every seek, pause or
  * skip. The server side takes 75–155 ms of it (mostly the MP3 encoder), the phone ~50–100 ms
- * (MSE margin, 0.1 s Web Audio blocks); the rest covers Wi-Fi hiccups.
+ * (MSE margin, 0.1 s Web Audio blocks); the rest covers Wi-Fi and 4G hiccups (0.4 crackled
+ * over 4G).
  */
-export const SYNC_DELAY = 0.4
+export const SYNC_DELAY = 0.45
 const FRAME_BYTES = 576 // 192 kbit/s, 48 kHz, MPEG-1 layer III: no padding ever
 const FRAME_SAMPLES = 1152
 const BACKLOG_BYTES = 24_000 * 4 // last 4 s of MP3, so a new listener starts in sync at once
@@ -125,6 +127,18 @@ class Mixer {
   private backlogStart = 0
   private anchors: number[] = []
   private anchorMs: number | null = null
+  /** Tempo of what's playing (null: unsure), for the booth's beat effects. */
+  private tempo = new TempoTracker(SR)
+  private tempoSubs = new Set<(bpm: number | null) => void>()
+
+  get bpm() {
+    return this.tempo.bpm
+  }
+
+  onTempo(fn: (bpm: number | null) => void) {
+    this.tempoSubs.add(fn)
+    return () => this.tempoSubs.delete(fn)
+  }
 
   // ------------------------------------------------------------ deck controls
 
@@ -262,6 +276,7 @@ class Mixer {
     this.rest = Buffer.alloc(0)
     this.epoch++
     this.samples = this.bytesOut = this.backlogStart = 0
+    this.tempo.reset()
     this.backlog = []
     this.pcmBacklog = []
     this.anchors = []
@@ -390,6 +405,7 @@ class Mixer {
       out[2 * i + 1] = R[i]!
     }
     stdin.write(Buffer.from(out.buffer))
+    if (this.tempo.push(L, R)) for (const fn of this.tempoSubs) fn(this.tempo.bpm)
 
     // Same audio as raw 16-bit PCM, for browsers that can't stream MP3 (Firefox, iPhones).
     const i16 = new Int16Array(n * 2) // little-endian on every machine this runs on

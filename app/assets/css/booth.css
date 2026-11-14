@@ -28,12 +28,27 @@
 .instant-add button { flex: none; white-space: nowrap; }
 
 /* Hold buttons */
-.holds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.holds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .hold { border: 0; border-radius: 18px; background: var(--panel-2); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 20px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .hold span { font-size: 13px; }
 .hold small { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .hold.on { border-color: var(--accent); background: var(--grad); color: var(--on-accent); box-shadow: var(--glow); }
 .hold.on small { color: var(--on-accent); }
+
+/* Stutter: one strip, a segment per loop length; hold and slide */
+.stutter { margin-top: 12px; }
+.stutter-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; font-size: 13px; }
+.stutter-head small { font-size: 11px; color: var(--muted); }
+.stutter-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 18px; background: var(--panel-2); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+.stutter-strip span { padding: 12px 0; border-radius: 14px; text-align: center; font-size: 14px; font-weight: 600; transition: background .08s; }
+.stutter-strip span.on { background: var(--grad); color: var(--on-accent); box-shadow: var(--glow); }
+
+.panel-actions { display: flex; gap: 6px; }
+.lights-toggle.on { background: var(--grad); color: var(--on-accent); }
+
+/* Light show: the whole screen flashes on the kicks */
+.lightshow { position: fixed; inset: 0; z-index: 1000; background: #000; display: flex; align-items: flex-end; justify-content: center; padding-bottom: max(24px, env(safe-area-inset-bottom)); cursor: pointer; touch-action: manipulation; }
+.lightshow-hint { color: rgba(255,255,255,.45); font-size: 12px; mix-blend-mode: difference; }
 
 /* XY pad: a touch square, filter on x, resonance + echo on y */
 .xy { position: relative; margin-top: 12px; aspect-ratio: 16 / 10; border-radius: 18px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: crosshair;

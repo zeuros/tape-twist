@@ -3,7 +3,8 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { DEFAULT_DUCK_DB, type BoothEvent, type BoothState, type ColorPreset, type Pad, type XY } from '#shared/types/booth'
+import { DEFAULT_DUCK_DB, STUTTER_BEATS, type BoothEvent, type BoothState, type ColorPreset, type Pad, type XY } from '#shared/types/booth'
+import { mixer } from './mixer'
 import { DATA_DIR, readJson, writeJson } from './store'
 
 /**
@@ -31,11 +32,15 @@ export interface PadInfo extends Pad {
 type PadEntry = Omit<PadInfo, 'durationSec'>
 
 type Persisted = Pick<BoothState, 'eq' | 'color' | 'duckDb' | 'padVolume'>
+export type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build'
 
 class Booth {
   private s: Persisted = { eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: DEFAULT_DUCK_DB, padVolume: 0.8 }
-  private holds = { talkover: 0, echo: 0, brake: 0, xy: 0 }
+  /** Light show: not saved, so a restart never brings it back on by surprise. */
+  private lights = false
+  private holds = { talkover: 0, echo: 0, brake: 0, rewind: 0, build: 0, stutter: 0, xy: 0 }
   private xy: XY | null = null
+  private stutter: number | null = null
   private holdTimers: Record<string, ReturnType<typeof setTimeout>> = {}
   private playing = new Map<string, ReturnType<typeof setTimeout>>()
   private subs = new Set<(e: BoothEvent) => void>()
@@ -43,7 +48,7 @@ class Booth {
   private padList: Promise<PadInfo[]> | null = null
 
   init() {
-    this.loaded ??= readJson<Partial<Persisted>>('fx.json', {}).then((fx) => {
+    this.loaded ??= readJson<Partial<Persisted> & { lights?: boolean }>('fx.json', {}).then(({ lights: _old, ...fx }) => {
       Object.assign(this.s, fx)
     })
     return this.loaded
@@ -56,8 +61,13 @@ class Booth {
       talkover: now < this.holds.talkover,
       echo: now < this.holds.echo,
       brake: now < this.holds.brake,
+      rewind: now < this.holds.rewind,
+      build: now < this.holds.build,
+      stutter: now < this.holds.stutter ? this.stutter : null,
       xy: now < this.holds.xy ? this.xy : null,
       pads: [...this.playing.keys()],
+      lights: this.lights,
+      bpm: mixer.bpm,
     }
   }
 
@@ -87,8 +97,13 @@ class Booth {
     await writeJson('fx.json', this.s)
   }
 
+  setLights(on: boolean, from?: string) {
+    this.lights = on
+    this.emitState(from)
+  }
+
   /** Hold buttons: on=true is re-sent every 2 s while held; released after 6 s of silence. */
-  hold(name: 'talkover' | 'echo' | 'brake', on: boolean, from?: string) {
+  hold(name: HoldName, on: boolean, from?: string) {
     const was = Date.now() < this.holds[name]
     this.holds[name] = on ? Date.now() + HOLD_TIMEOUT : 0
     clearTimeout(this.holdTimers[name])
@@ -103,6 +118,22 @@ class Booth {
     clearTimeout(this.holdTimers.xy)
     if (xy) this.holdTimers.xy = setTimeout(() => this.emitState(), HOLD_TIMEOUT + 50)
     this.emitState(from)
+  }
+
+  /** Stutter held (loop length in beats; null: let go). Held like the buttons. */
+  setStutter(beats: number | null, from?: string) {
+    const v = beats == null ? null : (STUTTER_BEATS.find((b) => Math.abs(b - beats) < 1e-6) ?? null)
+    const was = this.state.stutter
+    this.stutter = v
+    this.holds.stutter = v ? Date.now() + HOLD_TIMEOUT : 0
+    clearTimeout(this.holdTimers.stutter)
+    if (v) this.holdTimers.stutter = setTimeout(() => this.emitState(), HOLD_TIMEOUT + 50)
+    if (was !== v) this.emitState(from)
+  }
+
+  /** The tempo changed: phones size their beat effects from it. */
+  tempoChanged() {
+    this.emitState()
   }
 
   async pad(id: string, on: boolean, from?: string) {
@@ -125,10 +156,6 @@ class Booth {
     this.playing.clear()
     this.emit({ type: 'stopPads', from })
     this.emitState(from)
-  }
-
-  echoOut(from?: string) {
-    this.emit({ type: 'echoOut', from })
   }
 
   /** Where a pad's audio file is. */
@@ -307,3 +334,4 @@ async function probeDuration(file: string) {
 }
 
 export const booth = new Booth()
+mixer.onTempo(() => booth.tempoChanged())

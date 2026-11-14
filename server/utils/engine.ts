@@ -10,8 +10,6 @@ const PRELOAD_LEAD = 25 // s before the crossfade; a fresh Deezer page takes a f
 /** Hidden browsers are closed after this long without playback (frees RAM and the Deezer session). */
 const CLOSE_DECKS_AFTER = 15 * 60_000
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
 /**
  * Plays the evening on two decks and crossfades between them. Every command and the
  * auto-advance run one at a time through `serial`; a manual command interrupts a fade.
@@ -303,26 +301,6 @@ class Engine {
 
   stop() {
     return this.run(() => this.stopAll())
-  }
-
-  /**
-   * Echo out: cut the current track and bring the next one in. The echo itself is thrown
-   * by the listening browsers (they hold the echo send open until the cut reaches them).
-   */
-  echoOut() {
-    return this.run(async () => {
-      if (this.status !== 'playing') return
-      const cur = this.cur
-      const next = await this.neighbour(1)
-      await sleep(450)
-      await mixer.ramp([{ sink: cur.sink, to: 0 }], 0.25)
-      if (next) {
-        await sleep(600)
-        await this.switchTo(next, 2)
-      } else {
-        await this.stopAll()
-      }
-    })
   }
 
   async setSettings(s: Partial<EngineSettings>) {

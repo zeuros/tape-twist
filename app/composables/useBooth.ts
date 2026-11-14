@@ -1,6 +1,6 @@
-import { DEFAULT_DUCK_DB, type BoothEvent, type BoothState, type ColorPreset, type Eq, type Pad, type XY } from '#shared/types/booth'
+import { DEFAULT_BPM, DEFAULT_DUCK_DB, type BoothEvent, type BoothState, type ColorPreset, type Eq, type Pad, type XY } from '#shared/types/booth'
 
-type HoldName = 'talkover' | 'echo' | 'brake'
+type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build'
 
 /**
  * The booth (pads, holds, XY pad, colour, EQ). The server holds the shared state and relays
@@ -9,7 +9,7 @@ type HoldName = 'talkover' | 'echo' | 'brake'
  * devices follow within a few ms.
  */
 export const useBooth = defineSingleton(() => {
-  const booth = ref<BoothState>({ eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: DEFAULT_DUCK_DB, padVolume: 0.8, talkover: false, echo: false, brake: false, xy: null, pads: [] })
+  const booth = ref<BoothState>({ eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: DEFAULT_DUCK_DB, padVolume: 0.8, talkover: false, echo: false, brake: false, rewind: false, build: false, stutter: null, xy: null, pads: [], lights: false, bpm: null })
   const pads = ref<Pad[]>([])
   const fxError = ref('')
   /** Hold buttons pressed here count at once, before the server confirms. */
@@ -17,6 +17,9 @@ export const useBooth = defineSingleton(() => {
   /** XY pad position under this device's finger (null when not touching it here). */
   const xyLocal = ref<XY | null>(null)
   const xyShown = computed(() => xyLocal.value ?? booth.value.xy)
+  /** Stutter length under this device's finger (beats; null when not held here). */
+  const stutterLocal = ref<number | null>(null)
+  const stutterShown = computed(() => stutterLocal.value ?? booth.value.stutter)
   const clientId = Math.random().toString(36).slice(2)
   let eqEditedAt = 0
   let events: EventSource | null = null
@@ -45,9 +48,12 @@ export const useBooth = defineSingleton(() => {
     a.setTalkover(!!held.talkover || b.talkover)
     a.setEcho(!!held.echo || b.echo)
     a.setBrake(!!held.brake || b.brake)
+    a.setRewind(!!held.rewind || b.rewind)
+    a.setBuild(!!held.build || b.build, b.bpm ?? DEFAULT_BPM)
+    a.setStutter(stutterLocal.value ?? b.stutter, b.bpm ?? DEFAULT_BPM)
     a.setXY(xyLocal.value ?? b.xy)
   }
-  watch([booth, () => held.talkover, () => held.echo, () => held.brake, xyLocal], apply, { deep: true })
+  watch([booth, held, xyLocal, stutterLocal], apply, { deep: true })
 
   /** This device just started listening: give its audio the voice, the state and the pads. */
   function attach(a: BoothAudio) {
@@ -75,7 +81,6 @@ export const useBooth = defineSingleton(() => {
       if (e.from === clientId) return // already played here
       if (e.type === 'pad') void audio()?.pad(e.id, e.on)
       else if (e.type === 'stopPads') audio()?.stopPads()
-      else if (e.type === 'echoOut') audio()?.echoOut(useListening().liveLag())
     }
   }
 
@@ -115,14 +120,14 @@ export const useBooth = defineSingleton(() => {
     fx('color', { color: c })
   }
 
+  function setLights(on: boolean) {
+    booth.value.lights = on
+    fx('lights', { on })
+  }
+
   function setFxValue(action: 'duck' | 'padVolume', value: number) {
     booth.value[action === 'duck' ? 'duckDb' : 'padVolume'] = value
     fx(action, { value })
-  }
-
-  function echoOut() {
-    audio()?.echoOut(useListening().liveLag())
-    fx('echoOut')
   }
 
   let eqTimer: ReturnType<typeof setTimeout> | undefined
@@ -167,8 +172,8 @@ export const useBooth = defineSingleton(() => {
   }
 
   return {
-    booth, pads, fxError, held, xyLocal, xyShown,
+    booth, pads, fxError, held, xyLocal, xyShown, stutterLocal, stutterShown,
     showFxError, attach, fx, reloadPads, hitPad, stopPads, deletePad,
-    setColor, setFxValue, echoOut, setEq, resetEq, holdStart, holdEnd, start, stop,
+    setColor, setLights, setFxValue, setEq, resetEq, holdStart, holdEnd, start, stop,
   }
 })

@@ -2,7 +2,7 @@ import type { LiveAudio, SyncInfo } from '~/utils/liveAudio'
 
 /**
  * "Listen here": plays the live mix on this device, in sync with every other listening
- * device (~0.4 s behind the server, app/utils/liveAudio.ts), with the booth effects played
+ * device (~0.45 s behind the server, app/utils/liveAudio.ts), with the booth effects played
  * on top of it (app/utils/boothAudio.ts).
  */
 /** Range of the sync slider, in seconds. */
@@ -26,8 +26,6 @@ export const useListening = defineSingleton(() => {
   const setElement = (e: unknown) => (el = e as HTMLAudioElement | null)
   /** This device's booth audio, once it has listened (null before). */
   const getAudio = () => audio
-  /** How far this device is behind the server (a guess when the browser can't tell). */
-  const liveLag = () => live?.lag() ?? 3
 
   function setAhead(v: number) {
     ahead.value = v
@@ -132,5 +130,5 @@ export const useListening = defineSingleton(() => {
     audio = null
   }
 
-  return { listening, audioState, lag, ahead, setAhead, autoSync, runAutoSync, syncLabel, setElement, getAudio, liveLag, start, stop, onTrouble, onVisible, close }
+  return { listening, audioState, lag, ahead, setAhead, autoSync, runAutoSync, syncLabel, setElement, getAudio, start, stop, onTrouble, onVisible, close }
 })

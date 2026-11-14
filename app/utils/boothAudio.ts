@@ -5,8 +5,12 @@
  *    what changes it — echo, EQ, colour, duck (these respond within ~60 ms);
  *  - fx context (lowest latency): pads and the mic voice, added on top (instant).
  *
- *   <audio> ─▶ brake ─┬──────────────────────────────┬─▶ EQ ─▶ XY filter ─┬─ dry ────────────────┬─▶ duck ─▶ limiter ─▶ out
- *    (tape-stop delay) └─ echo send ─▶ ping-pong delay ┘                    └─ colour ─▶ wet (+noise)┘
+ *   <audio> ─▶ brake ─▶ rewind ─▶ stutter ─┬──────────────────────────────┬─▶ EQ ─▶ XY filter ─▶ build-up high-pass ─┐
+ *    (tape-stop  (reverse   (looping       └─ echo send ─▶ ping-pong delay ┘                                          │
+ *     delay)      delay)     delay)                                                                                    │
+ *     ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+ *     └┬─ dry ────────────────┬─▶ duck ─▶ out (+ build-up riser, snare roll, drop) ─▶ limiter ─▶ speaker
+ *      └─ colour ─▶ wet (+noise)┘                └─▶ kick meter (light show)
  *
  *   fx context:                          pads ─▶ pad gain ─────────────────────────┬─▶ limiter ─▶ out
  *   mic (talkover, this device only) ─▶ voice chain (app/utils/booth/voice.ts) ─────┘
@@ -33,6 +37,10 @@ const ECHO_DELAY = 0.375
 const ECHO_FEEDBACK = 0.55
 const BRAKE_SEC = 1.2 // turntable losing power: full speed to standstill
 const SPINUP_SEC = 0.35 // back to live, faster than real time
+const REWIND_ACCEL_SEC = 0.5 // from playing forward to full reverse
+const REWIND_RATE = 4 // delay growth at full reverse: plays backwards at 3× speed
+const REWIND_MAX = 15 // s of music it can rewind through, then it fades out
+const BUILD_BEATS = 16 // four bars from the press to the full build-up
 
 interface Preset {
   filters: [BiquadFilterType, number, number?, number?][] // type, freq, Q, gain
@@ -78,6 +86,16 @@ export class BoothAudio {
   private duck: GainNode
   private brakeDelay: DelayNode
   private brakeGain: GainNode
+  private rewindDelay: DelayNode
+  private rewindGain: GainNode
+  private stDry: GainNode
+  private stCap: GainNode
+  private stDelay: DelayNode
+  private stFb: GainNode
+  private stWet: GainNode
+  private buildHp: BiquadFilterNode
+  private kickMeter: AnalyserNode
+  private kickBuf = new Float32Array(1024)
   private djLp: BiquadFilterNode
   private djHp: BiquadFilterNode
   private echoFb: GainNode[] = []
@@ -97,8 +115,6 @@ export class BoothAudio {
   private duckDb = 10
   private talkover = false
   private echoHeld = false
-  private echoOutTimer: ReturnType<typeof setTimeout> | undefined
-  private echoOutOn = false
 
   /** Call from a tap (browsers only start audio after a user gesture). */
   constructor(el: HTMLAudioElement) {
@@ -115,7 +131,26 @@ export class BoothAudio {
     this.brakeDelay.delayTime.value = 0
     this.brakeGain = gain()
     const head = (this.head = gain())
-    src.connect(this.brakeDelay).connect(this.brakeGain).connect(head)
+    src.connect(this.brakeDelay).connect(this.brakeGain)
+
+    // Rewind: the same trick pushed further. The delay grows faster than time passes, so the
+    // music plays backwards (growth rate 4 = 3× speed in reverse); letting go cuts back to live.
+    this.rewindDelay = ctx.createDelay(REWIND_MAX + 1)
+    this.rewindDelay.delayTime.value = 0
+    this.rewindGain = gain()
+    this.brakeGain.connect(this.rewindDelay).connect(this.rewindGain)
+
+    // Stutter: a delay line always holds the last moment of music. Pressed, its input closes
+    // and its output feeds back into itself, so that slice loops until let go (the music runs
+    // on underneath, so it comes back live).
+    this.stDry = gain(1)
+    this.stCap = gain(1)
+    this.stDelay = ctx.createDelay(2)
+    this.stFb = gain(0)
+    this.stWet = gain(0)
+    this.rewindGain.connect(this.stDry).connect(head)
+    this.rewindGain.connect(this.stCap).connect(this.stDelay).connect(this.stWet).connect(head)
+    this.stDelay.connect(this.stFb).connect(this.stDelay)
 
     // Music sum: the stream plus the echo returns.
     const music = gain()
@@ -162,15 +197,17 @@ export class BoothAudio {
     // XY pad: DJ filter (low-pass one way, high-pass the other), wide open when idle.
     this.djLp = biquad(ctx, 'lowpass', 20000)
     this.djHp = biquad(ctx, 'highpass', 10)
-    this.eq[2]!.connect(this.djLp).connect(this.djHp)
+    // Build-up: a high-pass that climbs while held, taking the bass away until the drop.
+    this.buildHp = biquad(ctx, 'highpass', 10)
+    this.eq[2]!.connect(this.djLp).connect(this.djHp).connect(this.buildHp)
 
     // Colour: dry/wet crossfade; the wet path is mono-ish → filters → drive (+ crackle and hiss).
     this.duck = gain()
     this.dry = gain(1)
     this.wet = gain(0)
-    this.djHp.connect(this.dry).connect(this.duck)
+    this.buildHp.connect(this.dry).connect(this.duck)
     this.colorIn = gain()
-    this.djHp.connect(this.colorIn)
+    this.buildHp.connect(this.colorIn)
     const cSplit = ctx.createChannelSplitter(2)
     this.colorIn.connect(cSplit)
     this.colorMerge = ctx.createChannelMerger(2)
@@ -197,6 +234,11 @@ export class BoothAudio {
     this.syncMute = gain()
     this.out.connect(this.syncMute).connect(pre).connect(limiter).connect(ctx.destination)
     this.master = limiter
+
+    // Kick meter for the light show: the bass of what this device plays.
+    this.kickMeter = ctx.createAnalyser()
+    this.kickMeter.fftSize = this.kickBuf.length
+    this.out.connect(biquad(ctx, 'lowpass', 150)).connect(this.kickMeter)
 
     // Instant side (low-latency context): pads and voice, added on top of the music.
     const fxOut = gain(1, fx)
@@ -336,22 +378,8 @@ export class BoothAudio {
     this.updateEcho()
   }
 
-  /**
-   * Echo out: the server cuts the track ~0.7 s after the tap, and the cut reaches this
-   * device `lagSec` later. Keep the echo send open until then, so the tail rings over the gap.
-   */
-  echoOut(lagSec: number) {
-    clearTimeout(this.echoOutTimer)
-    this.echoOutOn = true
-    this.updateEcho()
-    this.echoOutTimer = setTimeout(() => {
-      this.echoOutOn = false
-      this.updateEcho()
-    }, (0.7 + lagSec) * 1000)
-  }
-
   private updateEcho() {
-    this.glide(this.echoSend.gain, Math.max(this.echoHeld || this.echoOutOn ? 1 : 0, this.xyEcho), 0.015)
+    this.glide(this.echoSend.gain, Math.max(this.echoHeld ? 1 : 0, this.xyEcho), 0.015)
   }
 
   // --------------------------------------------------------- XY and brake
@@ -429,6 +457,158 @@ export class BoothAudio {
       d.linearRampToValueAtTime(0, t + SPINUP_SEC)
       g.linearRampToValueAtTime(1, t + 0.06)
     }
+  }
+
+  // ------------------------------------------------------------ rewind
+
+  /** Running rewind: when it started and when it runs out (its gain then fades, see the release). */
+  private rewindSeg = { on: false, t0: 0, fadeAt: Infinity }
+
+  /** Held: spins backwards, faster and faster. Let go: cuts straight back to live. */
+  setRewind(on: boolean) {
+    if (on === this.rewindSeg.on) return
+    const t = this.ctx.currentTime
+    const d = this.rewindDelay.delayTime
+    const g = this.rewindGain.gain
+    d.cancelScheduledValues(0)
+    g.cancelScheduledValues(0)
+    if (on) {
+      // The delay starts at 0 (a release always cuts back to it), its growth climbs to REWIND_RATE.
+      d.setValueAtTime(0, t)
+      const a = REWIND_ACCEL_SEC
+      const n = 20
+      for (let i = 1; i <= n; i++) {
+        const s = (i / n) * a
+        d.linearRampToValueAtTime((REWIND_RATE * s * s) / (2 * a), t + s)
+      }
+      const dA = (REWIND_RATE * a) / 2
+      const tEnd = a + (REWIND_MAX - dA) / REWIND_RATE
+      d.linearRampToValueAtTime(REWIND_MAX, t + tEnd)
+      this.rewindSeg = { on, t0: t, fadeAt: t + tEnd - 0.3 }
+      g.setValueAtTime(1, t)
+      g.setTargetAtTime(0, this.rewindSeg.fadeAt, 0.1) // ran out of music to rewind
+    } else {
+      // Cut: a quick fade out, the delay back to 0 in the silence, a quick fade in.
+      const { fadeAt } = this.rewindSeg
+      this.rewindSeg = { on, t0: t, fadeAt: Infinity }
+      g.setValueAtTime(t < fadeAt ? 1 : Math.exp(-(t - fadeAt) / 0.1), t)
+      g.linearRampToValueAtTime(0, t + 0.03)
+      d.setValueAtTime(0, t + 0.035)
+      g.linearRampToValueAtTime(0, t + 0.04)
+      g.linearRampToValueAtTime(1, t + 0.08)
+    }
+  }
+
+  // ----------------------------------------------------------- stutter
+
+  private stutterLen: number | null = null
+
+  /** Held: loops the last `beats` of music (null: back to live). */
+  setStutter(beats: number | null, bpm: number) {
+    const len = beats ? Math.max(0.03, Math.min(1.9, (beats * 60) / bpm)) : null
+    if (len === this.stutterLen) return
+    const t = this.ctx.currentTime
+    const engaged = this.stutterLen != null
+    this.stutterLen = len
+    if (len != null) {
+      this.stDelay.delayTime.setValueAtTime(len, t)
+      if (engaged) return // a new length while held: the loop shrinks or grows from here
+      this.glide(this.stCap.gain, 0, 0.002)
+      this.glide(this.stFb.gain, 1, 0.002)
+      this.glide(this.stWet.gain, 1, 0.002)
+      this.glide(this.stDry.gain, 0, 0.002)
+    } else {
+      this.glide(this.stCap.gain, 1, 0.002)
+      this.glide(this.stFb.gain, 0, 0.002)
+      this.glide(this.stWet.gain, 0, 0.002)
+      this.glide(this.stDry.gain, 1, 0.002)
+    }
+  }
+
+  // ---------------------------------------------------------- build-up
+
+  private build: { t0: number; nodes: AudioScheduledSourceNode[]; riser: GainNode } | null = null
+  private sounds: { snare: AudioBuffer; drop: AudioBuffer; noise: AudioBuffer } | null = null
+
+  /**
+   * Held: over four bars the bass is filtered away, a noise riser climbs and a snare roll
+   * speeds up (quarters, eighths, sixteenths, thirty-seconds). Let go: the drop, everything
+   * back at once with a sub hit and a crash.
+   */
+  setBuild(on: boolean, bpm: number) {
+    if (on === !!this.build) return
+    const ctx = this.ctx
+    const t = ctx.currentTime
+    const f = this.buildHp.frequency
+    const q = this.buildHp.Q
+    f.cancelScheduledValues(0)
+    q.cancelScheduledValues(0)
+    if (on) {
+      const s = (this.sounds ??= buildSounds(ctx))
+      const beat = 60 / bpm
+      const total = BUILD_BEATS * beat
+      f.setValueAtTime(10, t)
+      f.exponentialRampToValueAtTime(1400, t + total)
+      q.setValueAtTime(Math.SQRT1_2, t)
+      q.linearRampToValueAtTime(3, t + total)
+
+      const riser = gainNode(ctx, 0.0001)
+      const bp = biquad(ctx, 'bandpass', 300, 1.2)
+      const noise = ctx.createBufferSource()
+      noise.buffer = s.noise
+      noise.loop = true
+      noise.connect(bp).connect(riser).connect(this.out)
+      bp.frequency.setValueAtTime(300, t)
+      bp.frequency.exponentialRampToValueAtTime(9000, t + total)
+      riser.gain.setValueAtTime(0.0001, t)
+      riser.gain.exponentialRampToValueAtTime(0.35, t + total)
+      noise.start(t)
+
+      const nodes: AudioScheduledSourceNode[] = [noise]
+      const roll: [number, number][] = [[8, 1], [4, 1 / 2], [2, 1 / 4], [2, 1 / 8], [16, 1 / 8]] // beats, step
+      let b = 0
+      for (const [len, step] of roll) {
+        for (let x = 0; x < len - 1e-9; x += step, b += step) {
+          const hit = ctx.createBufferSource()
+          hit.buffer = s.snare
+          const g = gainNode(ctx, 0.2 + 0.6 * Math.min(1, b / BUILD_BEATS))
+          hit.connect(g).connect(this.out)
+          hit.start(t + b * beat)
+          nodes.push(hit)
+        }
+      }
+      this.build = { t0: t, nodes, riser }
+    } else {
+      const b = this.build!
+      this.build = null
+      for (const n of b.nodes) {
+        try {
+          n.stop(t + 0.05)
+        } catch {
+          /* already stopped */
+        }
+      }
+      b.riser.gain.cancelScheduledValues(0)
+      b.riser.gain.setTargetAtTime(0, t, 0.02)
+      f.setValueAtTime(10, t)
+      q.setValueAtTime(Math.SQRT1_2, t)
+      if (t - b.t0 > 1.5) {
+        const drop = ctx.createBufferSource()
+        drop.buffer = this.sounds!.drop
+        drop.connect(gainNode(ctx, 0.9)).connect(this.out)
+        drop.start(t)
+      }
+    }
+  }
+
+  // ------------------------------------------------------- light show
+
+  /** Bass level of what this device plays right now (RMS), for the light show. */
+  kickLevel() {
+    this.kickMeter.getFloatTimeDomainData(this.kickBuf)
+    let s = 0
+    for (const x of this.kickBuf) s += x * x
+    return Math.sqrt(s / this.kickBuf.length)
   }
 
   setPadVolume(v: number) {
@@ -513,6 +693,40 @@ export class BoothAudio {
 
   closeMic() {
     this.talk.closeMic()
+  }
+}
+
+/** The build-up's sounds, synthesised once: a snare hit, the drop (sub hit + crash) and noise. */
+function buildSounds(ctx: BaseAudioContext) {
+  const sr = ctx.sampleRate
+  const make = (sec: number, fill: (t: number, noise: number) => [number, number]) => {
+    const n = Math.floor(sec * sr)
+    const buf = ctx.createBuffer(2, n, sr)
+    const L = buf.getChannelData(0)
+    const R = buf.getChannelData(1)
+    let last = 0
+    for (let i = 0; i < n; i++) {
+      const w = Math.random() * 2 - 1
+      const bright = w - last // first difference: brighter noise
+      last = w
+      ;[L[i], R[i]] = fill(i / sr, bright)
+    }
+    return buf
+  }
+  let phase = 0
+  return {
+    snare: make(0.22, (t, nz) => {
+      const body = Math.sin(2 * Math.PI * 185 * t) * Math.exp(-t * 40) * 0.5
+      const v = nz * Math.exp(-t * 18) * 0.45 + body
+      return [v, v]
+    }),
+    drop: make(2.2, (t, nz) => {
+      phase += (2 * Math.PI * (36 + 70 * Math.exp(-t * 7))) / sr
+      const sub = Math.sin(phase) * Math.exp(-t * 1.6) * 0.9
+      const crash = nz * Math.exp(-t * 2.4) * 0.22
+      return [sub + crash, sub + crash * 0.9]
+    }),
+    noise: make(2, (_t, nz) => [nz * 0.5, nz * 0.5]),
   }
 }
 

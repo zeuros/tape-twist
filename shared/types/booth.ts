@@ -23,10 +23,24 @@ export interface BoothState {
   talkover: boolean
   echo: boolean
   brake: boolean
+  /** Rewind held: the music spins backwards, then drops back in live. */
+  rewind: boolean
+  /** Build-up held: bass filtered out, riser and snare roll; letting go is the drop. */
+  build: boolean
+  /** Stutter held: loop length in beats (1, 1/2, 1/4, 1/8), else null. */
+  stutter: number | null
   /** XY filter pad while a finger is on it, else null. */
   xy: XY | null
   pads: string[] // playing now
+  /** Light show: every listening phone's screen flashes on the kicks. */
+  lights: boolean
+  /** Tempo of the music, measured on the server (null: unsure). */
+  bpm: number | null
 }
+
+export const STUTTER_BEATS = [1, 1 / 2, 1 / 4, 1 / 8] as const
+/** Tempo used while the server isn't sure of it. */
+export const DEFAULT_BPM = 124
 
 /** A soundboard pad, as listed by `GET /api/pads`. */
 export interface Pad {
@@ -45,7 +59,6 @@ export type BoothEvent =
   | { type: 'state'; state: BoothState; from?: string }
   | { type: 'pad'; id: string; on: boolean; from?: string }
   | { type: 'stopPads'; from?: string }
-  | { type: 'echoOut'; from?: string }
   | { type: 'padsChanged'; from?: string }
 
 /** How far the music ducks under talkover / pads by default (dB). */
