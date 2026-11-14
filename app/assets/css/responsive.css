@@ -34,8 +34,11 @@
   .conn button { white-space: nowrap; }
   .qr-btn { width: 44px; }
   .conn-text small { max-width: 100%; }
-  .ops { flex-direction: column; }
-  .time { width: 34px; }
+  /* Playlist rows on one line: the ⠿ handle reorders on touch, so ↑ ↓ go; ✕ stays, compact. */
+  .ev { align-items: center; gap: 8px; }
+  .ev .time { width: 34px; padding-top: 0; }
+  .ev .ops .move { display: none; }
+  .ev .ops button { width: 32px; height: 32px; padding: 0; }
   .remote { left: 6px; right: 6px; bottom: 6px; border-radius: 20px; }
   .remote-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; padding: 8px 12px; }
   .extras { grid-column: 1 / -1; justify-content: space-between; }

@@ -66,8 +66,8 @@ const handleUp = () => (dragFrom.value = null)
         </div>
       </div>
       <div class="ops">
-        <button class="ghost sm" title="Move up" :disabled="i === 0" @click="swap(i, -1)">↑</button>
-        <button class="ghost sm" title="Move down" :disabled="i === evening.items.length - 1" @click="swap(i, 1)">↓</button>
+        <button class="ghost sm move" title="Move up" :disabled="i === 0" @click="swap(i, -1)">↑</button>
+        <button class="ghost sm move" title="Move down" :disabled="i === evening.items.length - 1" @click="swap(i, 1)">↓</button>
         <button class="ghost sm" title="Remove" @click="removeAt(i)">✕</button>
       </div>
     </li>
