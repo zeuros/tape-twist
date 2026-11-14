@@ -18,10 +18,20 @@ export interface MixRequest {
   count: number
   /** What the playlist already holds (avoid repeats, follow its vibe). */
   current: { artist: string; title: string }[]
+  /** Index in `current` of the song playing now (-1: nothing). It and the ones before it stay put. */
+  playingIndex: number
   playlistTitle?: string
 }
+/** One slot of the rearranged upcoming part: an existing song (index in `current`) or a new one (index in `items`). */
+export type Slot = { cur: number } | { add: number }
 export interface MixResult {
+  /** The new songs. */
   items: FavItem[]
+  /**
+   * The upcoming part of the playlist (everything after `playingIndex`) as Claude laid it out,
+   * every upcoming song exactly once, new ones placed among them. Absent: append `items`.
+   */
+  arrangement?: Slot[]
   note: string
   ms: number
 }
@@ -41,11 +51,23 @@ Rules:
 - Variety: at most 2 songs per artist. Nothing already in the playlist.
 - Order them as a set that flows: energy and tempo evolving smoothly, no jarring jumps.
 - Match the request's language/scene when it implies one (e.g. French, German minimal).
-- "note": one short sentence for the host about the direction you took (same language as the request).`
+- The upcoming songs of the playlist are numbered P0, P1… You have some latitude with them:
+  place the new songs between them where they fit best (not only at the end), and move upcoming
+  songs when the request asks for it ("group the sea shanties", "put X after Y", "end on
+  something calm") or when a move clearly makes the set flow better. Don't reshuffle for its own
+  sake, and never drop one: songs can't be removed. Songs already played stay where they are.
+- "note": one short sentence for the host about what you did (same language as the request);
+  mention any songs you moved.`
+
+/** First upcoming song (after the one playing). */
+const upFrom = (r: MixRequest) => Math.max(0, r.playingIndex + 1)
 
 function context(r: MixRequest) {
-  const cur = r.current.slice(-40).map((c) => `- ${c.artist} — ${c.title}`).join('\n')
-  return `Playlist${r.playlistTitle ? ` "${r.playlistTitle}"` : ''} currently holds ${r.current.length} songs${cur ? `, ending with:\n${cur}` : '.'}
+  const s = upFrom(r)
+  const played = r.current.slice(Math.max(0, s - 8), s).map((c) => `- ${c.artist} — ${c.title}`).join('\n')
+  const up = r.current.slice(s).map((c, i) => `P${i}|${c.artist} — ${c.title}`).join('\n')
+  return `Playlist${r.playlistTitle ? ` "${r.playlistTitle}"` : ''} holds ${r.current.length} songs.
+${played ? `Already played or playing (last ones, fixed):\n${played}\n` : ''}${up ? `Upcoming, in play order:\n${up}` : 'Nothing upcoming.'}
 Host request: ${r.prompt}`
 }
 
@@ -92,11 +114,18 @@ function askClaude<T>(prompt: string, schema: object): Promise<T> {
 }
 
 const NOTE = { type: 'string' }
-const PICKS_SCHEMA = {
+const ORDER_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['picks', 'note'],
-  properties: { note: NOTE, picks: { type: 'array', items: { type: 'integer' } } },
+  required: ['order', 'note'],
+  properties: {
+    note: NOTE,
+    order: {
+      type: 'array',
+      items: { type: 'string', pattern: '^[PN][0-9]+$' },
+      description: 'The whole upcoming part in play order: every P exactly once, plus the chosen N songs placed among them',
+    },
+  },
 }
 const SEARCH_SCHEMA = {
   type: 'object',
@@ -128,28 +157,55 @@ async function mapLimit<T, R>(xs: T[], n: number, fn: (x: T) => Promise<R>): Pro
 }
 
 const dur = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-const line = (i: number, f: FavItem) => `${i}|${f.artist} — ${f.title}|${dur(f.durationSec)}${f.genre ? `|${f.genre}` : ''}`
+const line = (i: number, f: FavItem) => `N${i}|${f.artist} — ${f.title}|${dur(f.durationSec)}${f.genre ? `|${f.genre}` : ''}`
 const key = (a: string, t: string) => norm(`${a} ${t}`)
 
 // ------------------------------------------------------------------- dig
 
 async function choose(r: MixRequest, pool: FavItem[], what: string) {
-  if (!pool.length) throw new Error('Nothing to choose from (are the platforms connected?)')
-  const a = await askClaude<{ picks: number[]; note: string }>(
-    `${PRE_PROMPT}\n\n${context(r)}\n\n${what} Lines are "number|artist — title|length|genre". Choose ${r.count} of them (fewer if not enough fit), in play order, and answer with their numbers.\n\n${pool.map((f, i) => line(i, f)).join('\n')}`,
-    PICKS_SCHEMA,
+  const s = upFrom(r)
+  const upCount = r.current.length - s
+  if (!pool.length && !upCount) throw new Error('Nothing to choose from (are the platforms connected?)')
+  const candidates = pool.length
+    ? `${what} Lines are "N<number>|artist — title|length|genre". Choose up to ${r.count} of them (fewer if not enough fit, none if the request only asks to rearrange).\n\n${pool.map((f, i) => line(i, f)).join('\n')}`
+    : 'No new songs this time: only rearrange the upcoming ones as asked.'
+  const a = await askClaude<{ order: string[]; note: string }>(
+    `${PRE_PROMPT}\n\n${context(r)}\n\n${candidates}\n\nAnswer with "order": the whole upcoming part as it should play, P and N numbers mixed.`,
+    ORDER_SCHEMA,
   )
   const items: FavItem[] = []
-  for (const n of a.picks) {
-    const f = pool[n]
-    if (f && !items.includes(f) && items.length < r.count) items.push(f)
+  const slots: Slot[] = []
+  const usedP = new Set<number>()
+  for (const tok of a.order) {
+    const n = Number(tok.slice(1))
+    if (tok[0] === 'P') {
+      if (n < upCount && !usedP.has(n)) {
+        usedP.add(n)
+        slots.push({ cur: s + n })
+      }
+    } else {
+      const f = pool[n]
+      if (f && !items.includes(f) && items.length < r.count) {
+        slots.push({ add: items.length })
+        items.push(f)
+      }
+    }
   }
-  return { items, note: a.note }
+  // A song Claude forgot goes back right after the song it followed (or first).
+  for (let n = 0; n < upCount; n++) {
+    if (usedP.has(n)) continue
+    const after = slots.findIndex((x) => 'cur' in x && x.cur === s + n - 1)
+    slots.splice(after + 1, 0, { cur: s + n })
+    usedP.add(n)
+  }
+  const moved = slots.some((x, i) => 'cur' in x && slots.slice(0, i).some((y) => 'cur' in y && y.cur > x.cur))
+  const inserted = slots.some((x, i) => 'add' in x && slots.slice(i).some((y) => 'cur' in y))
+  return { items, note: a.note, arrangement: moved || inserted ? slots : undefined }
 }
 
 async function dig(r: MixRequest) {
   const plan = await askClaude<{ references: string[]; queries: string[] }>(
-    `${PRE_PROMPT}\n\n${context(r)}\n\nFirst step: write catalog searches (SoundCloud and Deezer search boxes) that will surface candidates: the reference tracks named in the request (if any), then 6-10 queries (artists, labels, remixers, genre words) for songs that fit.`,
+    `${PRE_PROMPT}\n\n${context(r)}\n\nFirst step: write catalog searches (SoundCloud and Deezer search boxes) that will surface candidates: the reference tracks named in the request (if any), then 6-10 queries (artists, labels, remixers, genre words) for songs that fit. If the request only asks to rearrange the playlist (no new songs wanted), return no queries and no references.`,
     SEARCH_SCHEMA,
   )
   const have = new Set(r.current.map((c) => key(c.artist, c.title)))

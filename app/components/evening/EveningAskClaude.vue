@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import type { FavItem } from '#shared/types/music'
 
-/** One line at the top of the playlist: Claude finds songs, they're added to that playlist. */
-const { evening, append } = useEvening()
+/**
+ * One line at the top of the playlist: Claude finds songs and places them in that playlist,
+ * possibly moving the upcoming songs around (never the ones already played).
+ */
+const { evening, append, arrange } = useEvening()
+const { eng } = useEngine()
 const prompt = ref('')
 const count = ref(Number(readPref('aiCount')) || 10)
 const busy = ref(false)
@@ -15,17 +19,22 @@ async function ask() {
   const target = evening.value
   busy.value = true
   status.value = 'Claude is choosing…'
+  const ids = target.items.slice(0, 300).map((i) => i.id)
+  const playingIndex = ids.indexOf(eng.value?.current?.id ?? '')
   try {
-    const r = await $fetch<{ items: FavItem[]; note: string; ms: number }>('/api/ai/mix', {
+    const r = await $fetch<{ items: FavItem[]; arrangement?: ({ cur: number } | { add: number })[]; note: string; ms: number }>('/api/ai/mix', {
       method: 'POST',
       body: {
         prompt: text,
         count: Math.max(1, Math.min(40, count.value || 10)),
         playlistTitle: target.title,
-        current: target.items.map((i) => ({ artist: i.artist, title: i.title })),
+        current: target.items.slice(0, 300).map((i) => ({ artist: i.artist, title: i.title })),
+        playingIndex,
       },
     })
-    const added = append(target.id, r.items)
+    const added = r.arrangement
+      ? arrange(target.id, ids, playingIndex + 1, r.arrangement, r.items).added
+      : append(target.id, r.items)
     status.value = `+${added} in ${(r.ms / 1000).toFixed(0)} s${r.note ? ` · ${r.note}` : ''}`
   } catch (e: any) {
     status.value = errorMessage(e, 'Claude failed')
