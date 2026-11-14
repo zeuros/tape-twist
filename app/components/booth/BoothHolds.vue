@@ -2,12 +2,13 @@
 /** Hold buttons: they act while pressed, on every listening device. */
 const { booth, held, holdStart, holdEnd } = useBooth()
 
-type Name = 'talkover' | 'brake' | 'rewind' | 'build'
+type Name = 'talkover' | 'brake' | 'rewind' | 'build' | 'lights'
 const HOLDS: { name: Name; emoji: string; label: string; title: string }[] = [
   { name: 'talkover', emoji: '🎙️', label: 'Talkover', title: "Hold: the music drops and your voice (this device's mic) plays with reverb" },
   { name: 'brake', emoji: '🛑', label: 'Brake', title: 'Hold: the music slows down to a stop like a turntable; let go to spin it back up' },
   { name: 'rewind', emoji: '⏪', label: 'Rewind', title: 'Hold: the music spins backwards, faster and faster; let go to drop back in' },
   { name: 'build', emoji: '🚀', label: 'Build-up', title: 'Hold: the bass fades away, a riser and a snare roll climb for four bars; let go for the drop' },
+  { name: 'lights', emoji: '💡', label: 'Lights', title: "Hold: every listening phone's screen (this one too) flashes a new colour on each kick" },
 ]
 
 function down(name: Name, e: PointerEvent) {

@@ -32,13 +32,11 @@ export interface PadInfo extends Pad {
 type PadEntry = Omit<PadInfo, 'durationSec'>
 
 type Persisted = Pick<BoothState, 'eq' | 'color' | 'duckDb' | 'padVolume'>
-export type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build'
+export type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'lights'
 
 class Booth {
   private s: Persisted = { eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: DEFAULT_DUCK_DB, padVolume: 0.8 }
-  /** Light show: not saved, so a restart never brings it back on by surprise. */
-  private lights = false
-  private holds = { talkover: 0, echo: 0, brake: 0, rewind: 0, build: 0, stutter: 0, xy: 0 }
+  private holds = { talkover: 0, echo: 0, brake: 0, rewind: 0, build: 0, lights: 0, stutter: 0, xy: 0 }
   private xy: XY | null = null
   private stutter: number | null = null
   private holdTimers: Record<string, ReturnType<typeof setTimeout>> = {}
@@ -66,7 +64,7 @@ class Booth {
       stutter: now < this.holds.stutter ? this.stutter : null,
       xy: now < this.holds.xy ? this.xy : null,
       pads: [...this.playing.keys()],
-      lights: this.lights,
+      lights: now < this.holds.lights,
       bpm: mixer.bpm,
     }
   }
@@ -95,11 +93,6 @@ class Booth {
     Object.assign(this.s, p)
     this.emitState(from)
     await writeJson('fx.json', this.s)
-  }
-
-  setLights(on: boolean, from?: string) {
-    this.lights = on
-    this.emitState(from)
   }
 
   /** Hold buttons: on=true is re-sent every 2 s while held; released after 6 s of silence. */

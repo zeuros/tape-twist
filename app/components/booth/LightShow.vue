@@ -1,23 +1,15 @@
 <script setup lang="ts">
 /**
- * Light show: when someone switches it on (Booth → 💡 Lights), every phone listening at that
- * moment (theirs too) turns its screen into a light that flashes a new colour on each kick of
- * the music it plays. The kicks are found in this device's own audio and shown when they
- * reach the speaker, so all phones flash together, like the music. A tap hides it on this
- * phone. A phone that starts listening while it's on doesn't join in: tapping "Listen here"
- * never makes the screen flash by surprise (switching it off and on again brings everyone in).
+ * Light show: while someone holds Booth → 💡 Lights, every listening phone (theirs too) turns
+ * its screen into a light that flashes a new colour on each kick of the music it plays. The
+ * kicks are found in this device's own audio and shown when they reach the speaker, so all
+ * phones flash together, like the music. Letting go ends it everywhere. The overlay lets
+ * touches through: the finger holding the button keeps it held underneath.
  */
-const { booth } = useBooth()
+const { booth, held } = useBooth()
 const listen = useListening()
 const el = ref<HTMLElement | null>(null)
-/** This phone takes part: it was listening when the lights were switched on, and wasn't tapped. */
-const active = ref(false)
-const shown = computed(() => active.value && listen.listening.value)
-watch(() => booth.value.lights, (on, was) => {
-  if (!on) active.value = false
-  else if (!was && listen.listening.value) active.value = true
-})
-watch(listen.listening, (on) => on || (active.value = false))
+const shown = computed(() => listen.listening.value && (!!held.lights || booth.value.lights))
 
 let raf = 0
 let avg = 0
@@ -81,8 +73,8 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
-    <div v-if="shown" ref="el" class="lightshow" role="button" aria-label="Hide the light show on this phone" @click="active = false" @keydown.esc="active = false">
-      <span class="lightshow-hint">💡 Light show · tap to hide</span>
+    <div v-if="shown" ref="el" class="lightshow" aria-hidden="true">
+      <span class="lightshow-hint">💡 Light show</span>
     </div>
   </Teleport>
 </template>

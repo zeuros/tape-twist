@@ -47,7 +47,7 @@
 .lights-toggle.on { background: var(--grad); color: var(--on-accent); }
 
 /* Light show: the whole screen flashes on the kicks */
-.lightshow { position: fixed; inset: 0; z-index: 1000; background: #000; display: flex; align-items: flex-end; justify-content: center; padding-bottom: max(24px, env(safe-area-inset-bottom)); cursor: pointer; touch-action: manipulation; }
+.lightshow { position: fixed; inset: 0; z-index: 1000; background: #000; display: flex; align-items: flex-end; justify-content: center; padding-bottom: max(24px, env(safe-area-inset-bottom)); pointer-events: none; }
 .lightshow-hint { color: rgba(255,255,255,.45); font-size: 12px; mix-blend-mode: difference; }
 
 /* XY pad: a touch square, filter on x, resonance + echo on y */

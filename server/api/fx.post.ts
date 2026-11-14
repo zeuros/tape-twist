@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
     case 'rewind': booth.hold('rewind', !!c.on, from); break
     case 'build': booth.hold('build', !!c.on, from); break
     case 'stutter': booth.setStutter(c.on === false ? null : Number(c.value), from); break
-    case 'lights': booth.setLights(!!c.on, from); break
+    case 'lights': booth.hold('lights', !!c.on, from); break
     case 'xy': booth.setXY(c.on === false ? null : { x: num(c.x, 0, 1), y: num(c.y, 0, 1) }, from); break
     case 'pad':
       if (c.on !== false && !mixer.listenerCount) {

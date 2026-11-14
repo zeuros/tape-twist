@@ -1,6 +1,6 @@
 import { DEFAULT_BPM, DEFAULT_DUCK_DB, type BoothEvent, type BoothState, type ColorPreset, type Eq, type Pad, type XY } from '#shared/types/booth'
 
-type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build'
+type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'lights'
 
 /**
  * The booth (pads, holds, XY pad, colour, EQ). The server holds the shared state and relays
@@ -128,11 +128,6 @@ export const useBooth = defineSingleton(() => {
     fx('color', { color: c })
   }
 
-  function setLights(on: boolean) {
-    booth.value.lights = on
-    fx('lights', { on })
-  }
-
   function setFxValue(action: 'duck' | 'padVolume', value: number) {
     booth.value[action === 'duck' ? 'duckDb' : 'padVolume'] = value
     fx(action, { value })
@@ -182,6 +177,6 @@ export const useBooth = defineSingleton(() => {
   return {
     booth, pads, fxError, held, xyLocal, xyShown, stutterLocal, stutterShown,
     showFxError, attach, fx, reloadPads, hitPad, stopPads, deletePad,
-    setColor, setLights, setFxValue, setEq, resetEq, holdStart, holdEnd, start, stop,
+    setColor, setFxValue, setEq, resetEq, holdStart, holdEnd, start, stop,
   }
 })

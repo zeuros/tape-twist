@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** The booth: pads, voice, holds, XY pad, colour, EQ and the engine's safety settings. */
-const { booth, fxError, stopPads, setFxValue, setColor, setLights } = useBooth()
+const { booth, fxError, stopPads, setFxValue, setColor } = useBooth()
 const { voicePreset, voiceVolume, setPreset, setVolume } = useVoice()
 const COLORS = [
   { id: 'off', label: 'Clean', emoji: '✨' },
@@ -16,7 +16,6 @@ const num = (e: Event) => Number((e.target as HTMLInputElement).value)
     <div class="panel-head">
       <h2>Booth</h2>
       <span class="panel-actions">
-        <button class="ghost sm lights-toggle" :class="{ on: booth.lights }" title="Light show: every listening phone's screen flashes on the kicks (tap a phone's screen to hide it there)" @click="setLights(!booth.lights)">💡 Lights {{ booth.lights ? 'on' : 'off' }}</button>
         <button class="ghost sm" :disabled="!booth.pads.length" @click="stopPads">Stop pads</button>
       </span>
     </div>

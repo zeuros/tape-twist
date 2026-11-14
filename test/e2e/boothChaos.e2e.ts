@@ -150,7 +150,7 @@ const ACTIONS: [weight: number, name: string, act: (p: Phone) => Promise<unknown
   [3, 'xy', (p) => drag(p.page, '.xy', 3 + Math.floor(rand() * 10))],
   [1.5, 'colour', (p) => tap(p.page, 'section.booth > .seg:not(.voice-seg) button', Math.floor(rand() * 4))],
   [1.5, 'eq', (p) => p.page.locator('.eq input[type=range]').nth(Math.floor(rand() * 3)).fill(String(Math.round(-26 + rand() * 32)))],
-  [0.6, 'lights', (p) => tap(p.page, '.lights-toggle')],
+  [0.6, 'lights', (p) => hold(p.page, 'Lights', 200 + rand() * 2000)],
   [0.6, 'stop pads', (p) => tap(p.page, 'button:has-text("Stop pads")')],
   [0.4, 'relisten', async (p) => {
     await tap(p.page, 'button.listen')
@@ -174,11 +174,9 @@ async function chaos(p: Phone, until: number, log: string[]) {
 async function calmDown() {
   for (const p of phones) await p.page.mouse.up().catch(() => {})
   const p = phones[0]!.page
-  if ((await p.locator('.lights-toggle').textContent())?.includes('on')) await p.locator('.lights-toggle').click()
   await p.locator('section.booth > .seg:not(.voice-seg) button').first().click()
   await p.locator('h3:has-text("EQ") button.link').click()
   if (await p.locator('button:has-text("Stop pads")').isEnabled()) await p.locator('button:has-text("Stop pads")').click()
-  for (const ph of phones) await ph.page.locator('.lightshow').click({ timeout: 500 }).catch(() => {})
   // Anyone who stopped listening listens again.
   for (const ph of phones) {
     if (!(await ph.page.locator('button.listen').textContent())?.includes('Listen here')) continue
@@ -295,22 +293,19 @@ describe('booth: four people messing about', () => {
     }
   })
 
-  it('light show: on every listening phone (the initiator too), not on one that joins later', async () => {
+  it('light show: on every listening phone (the one holding too) while Lights is held', async () => {
     const shown = () => Promise.all(phones.map((p) => p.page.locator('.lightshow').isVisible()))
-    expect(await shown(), 'no light show while it is off').toEqual([false, false, false, false])
+    expect(await shown(), 'no light show while nobody holds Lights').toEqual([false, false, false, false])
 
-    await phones[2]!.page.locator('.lights-toggle').click()
+    const page = phones[2]!.page
+    const i = (await page.locator('.hold').allTextContents()).findIndex((t) => t.includes('Lights'))
+    const b = await box(page, '.hold', i)
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+    await page.mouse.down()
     await expect.poll(shown, { timeout: 3000 }).toEqual([true, true, true, true])
-
-    // A phone that loads the page and taps "Listen here" while it's on: no surprise flashing.
-    const late = phones[0]!
-    await openPlayer(late.page, server.url)
-    await listen(late)
-    await sleep(1000)
-    expect(await late.page.locator('.lightshow').isVisible(), 'light show on a phone that just started listening').toBe(false)
-
-    await phones[2]!.page.locator('.lightshow').click()
-    await phones[2]!.page.locator('.lights-toggle').click()
+    await sleep(2500) // past a keep-alive: still on
+    expect(await shown(), 'still on while held').toEqual([true, true, true, true])
+    await page.mouse.up() // through the overlay: the button keeps the pointer
     await expect.poll(shown, { timeout: 3000 }).toEqual([false, false, false, false])
   })
 
