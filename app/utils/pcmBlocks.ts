@@ -7,7 +7,7 @@
  * 1152 samples (silence), so the timeline never shifts.
  */
 
-/** Frames per scheduled block (0.1 s at 48 kHz). */
+/** Frames per block (0.1 s at 48 kHz). */
 export const BLOCK = 4800
 export const MP3_FRAME_BYTES = 576
 export const MP3_FRAME_SAMPLES = 1152

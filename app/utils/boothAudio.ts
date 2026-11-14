@@ -120,19 +120,19 @@ export class BoothAudio {
   private echoHeld = false
 
   /**
-   * Call from a tap (browsers only start audio after a user gesture). The stream's decoded
-   * blocks are scheduled into `musicIn` (app/utils/liveAudio.ts).
+   * Call from a tap (browsers only start audio after a user gesture). The live player's
+   * AudioWorklet plays the stream into `musicIn` (app/utils/liveAudio.ts).
    */
   constructor() {
-    // At the stream's own rate: the browser then resamples once, at the output, if the phone's
-    // speaker runs at 44.1 kHz, instead of each 0.1 s block on its own (a seam every block).
+    // At the stream's own rate: if the phone's speaker runs at 44.1 kHz, the browser's own
+    // resampler converts at the output, better than the player's linear interpolation.
     // Not in Firefox: it won't connect the mic (auto-sync) to a context at another rate than the
-    // device's, and it plays the blocks seamlessly already.
+    // device's.
     const firefox = /firefox/i.test(navigator.userAgent)
     const ctx = (this.ctx = new AudioContext({ latencyHint: MUSIC_LATENCY, ...(firefox ? {} : { sampleRate: 48000 }) }))
     const fx = (this.fx = new AudioContext({ latencyHint: 'interactive' }))
     const gain = (v = 1, c: BaseAudioContext = ctx) => gainNode(c, v)
-    // The music comes in here, as scheduled blocks of the decoded stream.
+    // The music comes in here, from the live player's AudioWorklet (app/utils/liveAudio.ts).
     const src = (this.musicIn = gain())
 
     // Tape stop: a delay whose length grows ever faster slows the music down to a standstill
