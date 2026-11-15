@@ -56,7 +56,9 @@ watch(shown, (on) => {
     avg = prev = glow = 0
     raf = requestAnimationFrame(frame)
     void keepScreenOn()
+    nativeWake(true) // the app: screen on, over the lock screen (a browser can't wake a sleeping phone)
   } else {
+    nativeWake(false)
     nativeKeepAwake(false)
     void lock?.release().catch(() => {})
     lock = null
@@ -65,6 +67,7 @@ watch(shown, (on) => {
 onMounted(() => document.addEventListener('visibilitychange', onVisible))
 onBeforeUnmount(() => {
   cancelAnimationFrame(raf)
+  nativeWake(false)
   nativeKeepAwake(false)
   void lock?.release().catch(() => {})
   document.removeEventListener('visibilitychange', onVisible)

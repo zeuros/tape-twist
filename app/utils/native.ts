@@ -14,6 +14,8 @@ interface NowPlayingPlugin {
   update(o: { title: string; artist: string; playing: boolean }): Promise<void>
   /** Removes the notification and stops the service. */
   stop(): Promise<void>
+  /** Light show: turns the screen on, over the lock screen, while on. */
+  wake(o: { on: boolean }): Promise<void>
   addListener(event: 'action', cb: (e: { action: MediaAction }) => void): Promise<{ remove(): Promise<void> }>
 }
 const NowPlaying = registerPlugin<NowPlayingPlugin>('NowPlaying')
@@ -45,6 +47,11 @@ export function onNativeMediaAction(cb: (a: MediaAction) => void) {
   if (!isNative()) return
   if (!actionCb) void NowPlaying.addListener('action', (e) => actionCb?.(e.action))
   actionCb = cb
+}
+
+/** Light show in the app: lights the screen up (locked or asleep) and shows the app over the lock screen. */
+export function nativeWake(on: boolean) {
+  if (isNative()) void NowPlaying.wake({ on }).catch(() => {})
 }
 
 /** Keeps the screen on (the WebView has no Screen Wake Lock API). */
