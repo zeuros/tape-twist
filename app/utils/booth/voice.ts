@@ -264,6 +264,11 @@ export class VoiceChannel {
   /** Told when the voice opens (true) and closes (false), to send it while open. */
   onOpen: (open: boolean) => void = () => {}
 
+  /** Held, with the mic open. */
+  get open() {
+    return this.held && !!this.micSrc
+  }
+
   constructor(private ctx: AudioContext, out: AudioNode) {
     this.head = gainNode(ctx)
     this.notches = Array.from({ length: MAX_NOTCHES }, () => biquad(ctx, 'notch', 20, 30)) // 20 Hz = idle

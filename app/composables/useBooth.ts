@@ -161,7 +161,7 @@ export const useBooth = defineSingleton(() => {
   function holdEnd(name: HoldName) {
     if (!held[name]) return
     held[name] = false
-    if (name === 'talkover') void audio()?.voice(false)
+    if (name === 'talkover') useVoice().end()
     clearInterval(holdTimers[name])
     fx(name, { on: false })
   }

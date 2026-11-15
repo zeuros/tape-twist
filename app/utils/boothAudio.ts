@@ -19,12 +19,11 @@
 import type { ColorPreset, Eq, VoicePreset, XY } from '#shared/types/booth'
 import { biquad, dbToGain, driveCurve, gainNode, noiseBuffer, softLimitCurve } from './booth/dsp'
 import { measureRoom } from './booth/autoSync'
-import { addVoiceModule, VoiceChannel } from './booth/voice'
+import { VoiceChannel } from './booth/voice'
+import { sendVoice } from './booth/talkSender'
 import { MusicPitch } from './booth/pitch'
 import { voiceLink } from './voiceLink'
 
-/** Talkover keeps sending this long after release: the reverb's tail. */
-const VOICE_TAIL_MS = 1500
 /** The other devices' Talkover, louder than this device's own voice (it comes over the music). */
 const REMOTE_VOICE_DB = 9
 
@@ -272,30 +271,16 @@ export class BoothAudio {
     this.talk = new VoiceChannel(fx, fxOut)
     this.remoteGain = gain(0, fx)
     this.remoteGain.connect(fxOut)
-    void this.linkVoices(fxOut)
+    void this.linkVoices()
   }
 
   /**
    * Talkover on every device (app/utils/voiceLink.ts): this device's voice goes out while it's
    * open (plus the reverb's tail), the others' voices come in, mixed like this device's own.
    */
-  private async linkVoices(fxOut: GainNode) {
+  private async linkVoices() {
     const fx = this.fx
-    try {
-      await addVoiceModule(fx)
-    } catch {
-      return // no AudioWorklet: the voice stays on this device
-    }
-    const capture = new AudioWorkletNode(fx, 'voice-capture', { numberOfOutputs: 1, outputChannelCount: [1] })
-    this.talk.bus.connect(capture)
-    capture.connect(gainNode(fx, 0)).connect(fx.destination) // pulled by the graph
-    capture.port.onmessage = (e: MessageEvent<ArrayBuffer>) => voiceLink.send(e.data)
-    let tail: ReturnType<typeof setTimeout> | undefined
-    this.talk.onOpen = (open) => {
-      clearTimeout(tail)
-      if (open) capture.port.postMessage(true)
-      else tail = setTimeout(() => capture.port.postMessage(false), VOICE_TAIL_MS)
-    }
+    if (!(await sendVoice(fx, this.talk))) return // no AudioWorklet: the voice stays on this device
     const player = new AudioWorkletNode(fx, 'voice-player', { numberOfInputs: 0, outputChannelCount: [1] })
     player.connect(this.remoteGain)
     voiceLink.setSink((buf) => player.port.postMessage(buf, [buf]))

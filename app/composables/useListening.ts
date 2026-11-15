@@ -81,6 +81,7 @@ export const useListening = defineSingleton(() => {
       useBooth().attach(audio)
     }
     void audio.resume()
+    useVoice().dropSender() // this audio talks over from now on
     audio.setRemoteVoice(true)
     listening.value = true
     audioState.value = 'connecting'
