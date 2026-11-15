@@ -12,8 +12,33 @@
 <body>
   <div>
     <p>Can't reach the Tape Twist server.</p>
-    <p style="opacity:.6">Is <code>npm run serve</code> running?</p>
-    <button onclick="history.back(); setTimeout(() => location.reload(), 300)">Retry</button>
+    <p style="opacity:.6">Is <code>npm run serve</code> running? <span id="state">Retrying by itself…</span></p>
+    <button id="retry">Retry now</button>
   </div>
+  <script>
+    // Shown by the app (capacitor.config.ts errorPath) when the server didn't load, e.g. the
+    // computer was asleep. It asks the server again every 5 s and when the app comes back on
+    // screen, and opens it as soon as it answers. Dockerfile.apk fills in the address.
+    const SERVER = '__SERVER_URL__'
+    const open = () => location.replace(SERVER + '/')
+    let busy = false
+    async function probe() {
+      if (busy || document.hidden) return
+      busy = true
+      try {
+        // no-cors: any answer (even 401 without the PIN) resolves; only a network error throws.
+        await fetch(SERVER + '/api/lan', { mode: 'no-cors', cache: 'no-store' })
+        open()
+      } catch {
+        document.getElementById('state').textContent = 'Retrying by itself…'
+      } finally {
+        busy = false
+      }
+    }
+    document.getElementById('retry').onclick = open
+    document.addEventListener('visibilitychange', probe)
+    setInterval(probe, 5000)
+    probe()
+  </script>
 </body>
 </html>

@@ -36,6 +36,8 @@ COPY android android
 # self-signed one).
 ARG CAP_SERVER_URL
 RUN test -n "$CAP_SERVER_URL" || { echo "CAP_SERVER_URL is required" >&2; exit 1; }
+# The offline page (native/www) retries this address by itself.
+RUN sed -i "s#__SERVER_URL__#${CAP_SERVER_URL%/}#" native/www/index.html
 RUN --mount=type=cache,target=/root/.gradle \
     CAP_SERVER_URL="$CAP_SERVER_URL" npx cap sync android \
  && cd android && ./gradlew --no-daemon -q assembleDebug \

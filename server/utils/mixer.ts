@@ -326,8 +326,14 @@ class Mixer {
   /** `abandon`: the graph's render thread is stuck; don't wait on it (close() could block too). */
   private teardown(abandon = false) {
     clearInterval(this.watchdog)
-    this.capture?.kill('SIGTERM')
-    this.encoder?.kill('SIGTERM')
+    // The encoder waits on its stdin and ignores SIGTERM while it does: close it first, and
+    // SIGKILL whatever is still there 2 s later (each stop used to leave an encoder behind).
+    this.encoder?.stdin?.destroy()
+    for (const p of [this.capture, this.encoder]) {
+      if (!p) continue
+      p.kill('SIGTERM')
+      setTimeout(() => p.exitCode == null && p.signalCode == null && p.kill('SIGKILL'), 2000).unref()
+    }
     this.capture = this.encoder = null
     const g = this.graph
     this.graph = null
