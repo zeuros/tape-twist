@@ -14,7 +14,7 @@ RUN apt-get update \
 WORKDIR /app
 
 # Layers from the least to the most often changed, so a code change only rebuilds the app.
-# Optional: "Ask Claude" runs the Claude Code CLI with your login (mount ~/.claude, see compose).
+# Optional: "Ask Claude" runs the Claude Code CLI (token in data/claude-token, see compose).
 ARG WITH_CLAUDE=1
 RUN if [ "$WITH_CLAUDE" = 1 ]; then npm install -g @anthropic-ai/claude-code; fi
 

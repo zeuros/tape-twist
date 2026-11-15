@@ -13,7 +13,8 @@ services:
     volumes:
       # Credentials, browser profiles, playlists, recorded pads, PIN, certificate, APK.
       - ./data:/app/data:z   # :z lets SELinux (Fedora) allow the container to write there
-      # Ask Claude: your Claude Code login.
+      # Ask Claude: put a `claude setup-token` token in data/claude-token (or set
+      # CLAUDE_CODE_OAUTH_TOKEN above). Or mount your whole Claude Code login instead:
       # - ~/.claude:/home/app/.claude
       # - ~/.claude.json:/home/app/.claude.json
     restart: unless-stopped

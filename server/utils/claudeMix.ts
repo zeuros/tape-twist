@@ -1,5 +1,8 @@
 import { spawn } from 'node:child_process'
+import { readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { DATA_DIR } from './store'
 import { searchCatalogs } from './platforms'
 import { soundcloudRelated } from './soundcloud'
 import type { FavItem } from '#shared/types/music'
@@ -37,6 +40,13 @@ export interface MixResult {
 }
 
 const CLAUDE_BIN = process.env.CLAUDE_BIN || 'claude'
+/** A token from `claude setup-token` (for Docker): CLAUDE_CODE_OAUTH_TOKEN, else data/claude-token. */
+const TOKEN_FILE = join(DATA_DIR, 'claude-token')
+async function claudeEnv() {
+  if (process.env.CLAUDE_CODE_OAUTH_TOKEN) return process.env
+  const token = (await readFile(TOKEN_FILE, 'utf8').catch(() => '')).trim()
+  return token ? { ...process.env, CLAUDE_CODE_OAUTH_TOKEN: token } : process.env
+}
 const MODEL = process.env.CLAUDE_MIX_MODEL || 'claude-opus-5-5'
 const EFFORT = process.env.CLAUDE_MIX_EFFORT || 'low'
 
@@ -77,8 +87,9 @@ let queue: Promise<unknown> = Promise.resolve()
 
 /** One headless Claude Code call with a JSON-schema-constrained answer. One at a time. */
 function askClaude<T>(prompt: string, schema: object): Promise<T> {
-  const run = () =>
-    new Promise<T>((resolve, reject) => {
+  const run = async () => {
+    const env = await claudeEnv()
+    return new Promise<T>((resolve, reject) => {
       const args = [
         '-p', '--output-format', 'json', '--json-schema', JSON.stringify(schema),
         '--model', MODEL, '--effort', EFFORT,
@@ -86,7 +97,7 @@ function askClaude<T>(prompt: string, schema: object): Promise<T> {
       ]
       // Prompt on stdin (candidate lists can exceed the per-argument size limit); run outside
       // the project so no CLAUDE.md or project settings are loaded.
-      const child = spawn(CLAUDE_BIN, args, { cwd: tmpdir(), stdio: ['pipe', 'pipe', 'pipe'] })
+      const child = spawn(CLAUDE_BIN, args, { cwd: tmpdir(), env, stdio: ['pipe', 'pipe', 'pipe'] })
       let out = ''
       let err = ''
       const timer = setTimeout(() => child.kill('SIGTERM'), 150_000)
@@ -108,6 +119,7 @@ function askClaude<T>(prompt: string, schema: object): Promise<T> {
       })
       child.stdin.end(prompt)
     })
+  }
   const p = queue.then(run, run)
   queue = p.catch(() => {})
   return p

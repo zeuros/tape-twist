@@ -38,7 +38,7 @@ git clone https://github.com/zeuros/tape-twist.git && cd tape-twist
 
 That's it: open the printed link from any phone on the same Wi-Fi. The app stays on your local network. `./scripts/serve.sh --no-build` restarts it, `docker compose logs -f` follows it, `docker compose down` stops it. Your data (logins, playlists, PIN) stays in `./data`.
 
-> 💡 Ask Claude: uncomment the `~/.claude` mounts in `docker-compose.yml`.
+> 💡 Ask Claude: run `claude setup-token` on any machine logged in to Claude Code and save the token in `data/claude-token` (no restart needed).
 
 ### First evening
 
