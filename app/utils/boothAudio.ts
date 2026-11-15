@@ -19,7 +19,7 @@
 import type { ColorPreset, Eq, VoicePreset, XY } from '#shared/types/booth'
 import { biquad, dbToGain, driveCurve, gainNode, noiseBuffer, softLimitCurve } from './booth/dsp'
 import { measureRoom } from './booth/autoSync'
-import { VoiceChannel } from './booth/voice'
+import { addVoiceModule, VoiceChannel } from './booth/voice'
 import { sendVoice } from './booth/talkSender'
 import { MusicPitch } from './booth/pitch'
 import { voiceLink } from './voiceLink'
@@ -55,6 +55,8 @@ interface Preset {
   crackle: number // pop probability per sample
   hiss: number
   mono: number // 0 = stereo, 1 = mono
+  /** After the filters: tape wow and flutter, or the 8-bit crusher. */
+  extra?: 'wobble' | 'crush'
 }
 const PRESETS: Record<Exclude<ColorPreset, 'off'>, Preset> = {
   radio: {
@@ -68,6 +70,14 @@ const PRESETS: Record<Exclude<ColorPreset, 'off'>, Preset> = {
   vinyl: {
     filters: [['lowpass', 9000], ['highpass', 40], ['peaking', 120, 0.8, 2]],
     drive: 1.2, crackle: 0.0012, hiss: 0.006, mono: 0.2,
+  },
+  cassette: {
+    filters: [['highpass', 35], ['lowpass', 8500, 0.6], ['peaking', 90, 0.9, 3], ['peaking', 3000, 0.8, -2]],
+    drive: 1.6, crackle: 0, hiss: 0.012, mono: 0.15, extra: 'wobble',
+  },
+  bit8: {
+    filters: [['highpass', 90], ['lowpass', 10000]],
+    drive: 1, crackle: 0, hiss: 0, mono: 1, extra: 'crush',
   },
 }
 
@@ -90,6 +100,10 @@ export class BoothAudio {
   private drive: WaveShaperNode
   private noise: AudioBufferSourceNode | null = null
   private wetSum: GainNode
+  /** Cassette's wow and flutter: a delay line whose length wobbles. Made when first picked. */
+  private wobble: DelayNode | null = null
+  /** The 8-bit crusher (AudioWorklet), made when first picked. */
+  private crusher: Promise<AudioWorkletNode | null> | null = null
   private duck: GainNode
   private pitch: MusicPitch
   private brakeDelay: DelayNode
@@ -371,9 +385,11 @@ export class BoothAudio {
     const same = 1 - pr.mono / 2
     const cross = pr.mono / 2
     this.mono.forEach((g, i) => (g.gain.value = i === 0 || i === 3 ? same : cross))
-    // Filters.
+    // Filters, then the preset's extra.
     this.colorMerge.disconnect()
     for (const f of this.colorFilters) f.disconnect()
+    this.wobble?.disconnect()
+    void this.crusher?.then((c) => c?.disconnect())
     this.colorFilters = pr.filters.map(([type, freq, q, gain]) => {
       const b = this.ctx.createBiquadFilter()
       b.type = type
@@ -384,7 +400,19 @@ export class BoothAudio {
     })
     let node: AudioNode = this.colorMerge
     for (const f of this.colorFilters) node = node.connect(f)
-    node.connect(this.drive)
+    if (pr.extra === 'wobble') node.connect(this.tapeWobble()).connect(this.drive)
+    else if (pr.extra === 'crush') {
+      const last = node
+      this.crusher ??= addVoiceModule(this.ctx).then(
+        () => new AudioWorkletNode(this.ctx, 'booth-crusher', { outputChannelCount: [2] }),
+        () => null,
+      )
+      void this.crusher.then((c) => {
+        if (this.preset !== p) return // another colour picked meanwhile
+        if (c) last.connect(c).connect(this.drive)
+        else last.connect(this.drive) // no AudioWorklet: just the band
+      })
+    } else node.connect(this.drive)
     this.drive.curve = driveCurve(pr.drive)
     // Crackle and hiss.
     this.noise?.stop()
@@ -393,6 +421,21 @@ export class BoothAudio {
     this.noise.loop = true
     this.noise.connect(this.wetSum)
     this.noise.start()
+  }
+
+  /** The cassette's delay line: wow (0.6 Hz, ±1.5 ms) and flutter (7 Hz, ±0.08 ms). */
+  private tapeWobble() {
+    if (this.wobble) return this.wobble
+    const ctx = this.ctx
+    const d = (this.wobble = ctx.createDelay(0.05))
+    d.delayTime.value = 0.008
+    for (const [hz, depth] of [[0.6, 0.0015], [7, 0.00008]] as const) {
+      const lfo = ctx.createOscillator()
+      lfo.frequency.value = hz
+      lfo.connect(gainNode(ctx, depth)).connect(d.delayTime)
+      lfo.start()
+    }
+    return d
   }
 
   // ---------------------------------------------------- duck, echo, pads

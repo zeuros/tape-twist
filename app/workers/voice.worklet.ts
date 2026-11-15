@@ -3,8 +3,10 @@
  *   'voice-capture': this device's voice in, 16 kHz frames out over the port while on.
  *   'voice-player': the other devices' frames in over the port, their voices out.
  *   'voice-autotune': the auto-tune voice preset (app/utils/booth/autotune.ts).
+ *   'booth-crusher': the 8-bit colour, on the music (app/utils/booth/crusher.ts).
  */
 import { AutoTuneCore } from '../utils/booth/autotune'
+import { CrusherCore } from '../utils/booth/crusher'
 import { VoiceFramer, VoiceMixCore } from '../utils/voiceJitter'
 
 declare const sampleRate: number
@@ -59,6 +61,18 @@ class VoiceAutoTune extends AudioWorkletProcessor {
   }
 }
 
+class BoothCrusher extends AudioWorkletProcessor {
+  private core = new CrusherCore()
+
+  process(inputs: Float32Array[][], outputs: Float32Array[][]) {
+    const x = inputs[0]
+    if (!x?.length) return true // not in the chain right now
+    outputs[0]!.forEach((y, ch) => this.core.process(ch, x[ch] ?? x[0]!, y))
+    return true
+  }
+}
+
 registerProcessor('voice-capture', VoiceCapture)
+registerProcessor('booth-crusher', BoothCrusher)
 registerProcessor('voice-autotune', VoiceAutoTune)
 registerProcessor('voice-player', VoicePlayer)

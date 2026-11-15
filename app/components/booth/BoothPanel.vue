@@ -7,6 +7,8 @@ const COLORS = [
   { id: 'radio', label: 'Old radio', emoji: '📻' },
   { id: 'phone', label: 'Phone', emoji: '☎️' },
   { id: 'vinyl', label: 'Vinyl', emoji: '💿' },
+  { id: 'cassette', label: 'Cassette', emoji: '📼' },
+  { id: 'bit8', label: '8-bit', emoji: '🕹️' },
 ] as const
 const num = (e: Event) => Number((e.target as HTMLInputElement).value)
 </script>

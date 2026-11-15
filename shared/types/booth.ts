@@ -1,6 +1,6 @@
 /** Booth (effects) state shared by the server hub and every open player page. */
 
-export type ColorPreset = 'off' | 'radio' | 'phone' | 'vinyl'
+export type ColorPreset = 'off' | 'radio' | 'phone' | 'vinyl' | 'cassette' | 'bit8'
 export type VoicePreset = 'tannoy' | 'robot' | 'chipmunk' | 'monster' | 'megaphone' | 'vocoder' | 'autotune' | 'underwater'
 
 export interface Eq {

@@ -22,7 +22,7 @@ const REC_MAX_SEC = 6 // 4 s of voice + the reverb tail
 const HOLD_TIMEOUT = 6000 // a held button must be refreshed within this (lost touch-up safety)
 const run = promisify(execFile)
 
-export const COLORS: ColorPreset[] = ['off', 'radio', 'phone', 'vinyl']
+export const COLORS: ColorPreset[] = ['off', 'radio', 'phone', 'vinyl', 'cassette', 'bit8']
 
 /** A pad and where its sound is (the file never leaves the server). */
 export interface PadInfo extends Pad {
