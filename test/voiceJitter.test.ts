@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { VOICE_FRAME, VOICE_HEADER, VOICE_MAX, VOICE_SR, VOICE_START, VoiceFramer, VoiceMixCore } from '../app/utils/voiceJitter'
+import { VOICE_FRAME, VOICE_HEADER, VOICE_MAX, VOICE_SR, VOICE_START, VOICE_STEP, VoiceFramer, VoiceMixCore } from '../app/utils/voiceJitter'
 
 /** A relayed frame from talker `slot`, every sample = v. */
 function frame(slot: number, seq: number, v = 0.5) {
@@ -55,6 +55,17 @@ describe('VoiceMixCore', () => {
     expect(at(0)).toBeCloseTo(0.5, 5)
     expect(at(START_FRAMES)).toBe(0)
     expect(at(START_FRAMES + 1)).toBeCloseTo(0.25, 5)
+  })
+
+  it('waits VOICE_STEP longer after running dry (late frames)', () => {
+    const core = new VoiceMixCore()
+    for (let i = 0; i < START_FRAMES; i++) core.push(frame(0, i))
+    render(core, (START_FRAMES * VOICE_FRAME * 48000) / VOICE_SR) // plays it all: dry
+    const more = Math.ceil(((VOICE_START + VOICE_STEP) * VOICE_SR) / VOICE_FRAME)
+    for (let i = 0; i < START_FRAMES; i++) core.push(frame(0, START_FRAMES + i))
+    expect(render(core, 128).every((x) => x === 0)).toBe(true) // VOICE_START isn't enough now
+    for (let i = START_FRAMES; i < more; i++) core.push(frame(0, START_FRAMES + i))
+    expect(render(core, 128).every((x) => Math.abs(x - 0.5) < 1e-6)).toBe(true)
   })
 
   it('drops the oldest audio when a burst goes over VOICE_MAX', () => {

@@ -9,10 +9,16 @@
 export const VOICE_SR = 16000
 export const VOICE_FRAME = 320 // 20 ms
 export const VOICE_HEADER = 4
-/** Buffered before a talker starts playing (absorbs network jitter). */
-export const VOICE_START = 0.06
-/** More than this buffered (a burst after a stall): drop the oldest back to VOICE_START. */
-export const VOICE_MAX = 0.2
+/**
+ * Buffered before a talker starts playing (absorbs network jitter). Every time a talker runs dry
+ * (frames came late: 4G, the Funnel), it waits VOICE_STEP more before playing again, up to
+ * VOICE_GROW: a voice a little later rather than one cut in pieces.
+ */
+export const VOICE_START = 0.1
+export const VOICE_STEP = 0.05
+export const VOICE_GROW = 0.3
+/** More than this past the talker's start level (a burst after a stall): drop the oldest. */
+export const VOICE_MAX = 0.25
 /** A gap of up to this many lost frames is filled with silence; more, and the talker restarts. */
 const MAX_GAP = 25
 
@@ -64,6 +70,8 @@ class Talker {
   pos = 0
   playing = false
   nextSeq = -1
+  /** Buffered before playing (grows when it runs dry, see VOICE_STEP). */
+  start = VOICE_START * VOICE_SR
 
   get buffered() {
     return this.len - this.pos
@@ -85,8 +93,7 @@ class Talker {
     if (typeof x === 'number') this.data.fill(0, this.len, this.len + n)
     else this.data.set(x, this.len)
     this.len += n
-    const max = VOICE_MAX * VOICE_SR
-    if (this.buffered > max) this.pos = this.len - VOICE_START * VOICE_SR
+    if (this.buffered > this.start + VOICE_MAX * VOICE_SR) this.pos = this.len - this.start
   }
 }
 
@@ -122,12 +129,13 @@ export class VoiceMixCore {
     for (const t of this.talkers.values()) {
       for (let i = 0; i < out.length; i++) {
         if (!t.playing) {
-          if (t.buffered < VOICE_START * VOICE_SR) break
+          if (t.buffered < t.start) break
           t.playing = true
         }
         const i0 = Math.floor(t.pos)
         if (i0 + 1 >= t.len) {
-          t.playing = false // ran dry: wait for VOICE_START again
+          t.playing = false // ran dry: wait for a little more than before
+          t.start = Math.min(VOICE_GROW * VOICE_SR, t.start + VOICE_STEP * VOICE_SR)
           break
         }
         const a = t.data[i0]!

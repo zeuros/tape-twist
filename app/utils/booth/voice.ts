@@ -347,10 +347,12 @@ export class VoiceChannel {
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new Error(window.isSecureContext ? 'No microphone API in this browser.' : 'The microphone needs HTTPS: open the https:// address (npm run dev:https).')
     }
-    // Echo cancellation removes this device's own output from the mic: the first defence
-    // against larsen when this device drives the speakers.
+    // No echo cancellation (nor the other call processing): on Android it turns the phone into
+    // a call, which moves the music off a Bluetooth speaker onto the phone; and it removes this
+    // device's own output from the mic, so a listening talker's voice, played here, was
+    // cancelled out (gone, or chopped). Larsen is left to the feedback notches (watchFeedback).
     this.mic = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false, channelCount: 1 },
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 },
     })
     this.micSrc = this.ctx.createMediaStreamSource(this.mic)
     this.micSrc.connect(this.head)

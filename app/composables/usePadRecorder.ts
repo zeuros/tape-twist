@@ -28,7 +28,8 @@ export function usePadRecorder() {
     wanted = true
     let stream: MediaStream
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true } })
+      // No call processing: on Android it moves the music off a Bluetooth speaker (see VoiceChannel.openMic).
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
     } catch (err: any) {
       return showFxError(err?.name === 'NotAllowedError' ? 'Microphone access was refused.' : 'No microphone.')
     }
