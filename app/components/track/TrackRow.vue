@@ -15,6 +15,7 @@ const added = computed(() => inEvening.value.has(props.item.id))
       <div class="sub">
         <PlatformBadge :platform="item.platform" />
         <span v-if="item.kind === 'playlist'" class="badge set">set · {{ item.trackCount }}</span>
+        <span v-if="item.preview" class="badge preview" title="SoundCloud Go+: only a 30 s preview plays without a subscription">30 s</span>
         {{ item.artist }}
       </div>
     </div>

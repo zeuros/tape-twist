@@ -67,3 +67,4 @@ h2 { font-weight: 800; letter-spacing: -.02em; }
 .badge.soundcloud { background: color-mix(in srgb, var(--sc) 25%, transparent); color: var(--sc); }
 .badge.deezer { background: color-mix(in srgb, var(--dz) 28%, transparent); color: #c98bff; }
 .badge.set { background: var(--panel-2); color: var(--muted); }
+.badge.preview { background: color-mix(in srgb, #e5484d 22%, transparent); color: #ff8a8d; }

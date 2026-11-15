@@ -16,6 +16,8 @@ export interface FavItem {
   genre?: string
   addedAt?: string
   trackCount?: number
+  /** SoundCloud Go+: this account only gets a 30 s preview (found songs never are; only likes). */
+  preview?: boolean
 }
 
 export interface FavCache {

@@ -45,6 +45,13 @@ async function scPaged(c: Credentials, path: string, max = 5000) {
   return out
 }
 
+/**
+ * A track this account can play in full. SoundCloud Go+ tracks come back as policy SNIP (a 30 s
+ * preview: `duration` 30 s, `full_duration` the real length) without a subscription; BLOCK
+ * doesn't play at all. Searches and related tracks leave both out, so the Deezer version wins.
+ */
+const playable = (t: any) => t?.policy !== 'SNIP' && t?.policy !== 'BLOCK'
+
 const scArt = (u?: string | null) => u?.replace('-large.', '-t200x200.') || undefined
 
 function scTrack(t: any, addedAt?: string): FavItem {
@@ -61,6 +68,7 @@ function scTrack(t: any, addedAt?: string): FavItem {
     embedUrl: `https://w.soundcloud.com/player/?url=${encodeURIComponent(`https://api.soundcloud.com/tracks/${t.id}`)}&auto_play=true&visual=false&hide_related=true&show_comments=false`,
     genre: t.genre || undefined,
     addedAt,
+    preview: t.policy === 'SNIP' || undefined,
   }
 }
 
@@ -112,7 +120,7 @@ export async function searchSoundcloud(query: string, nb = 30): Promise<FavItem[
       scFetch(c, `/search/playlists_without_albums?q=${q}&limit=${Math.ceil(nb / 4)}`).catch(() => ({ collection: [] })),
     ])
     return [
-      ...((tracks?.collection ?? []) as any[]).map((t) => scTrack(t)),
+      ...((tracks?.collection ?? []) as any[]).filter(playable).map((t) => scTrack(t)),
       ...((sets?.collection ?? []) as any[]).map((pl) => scPlaylist(pl)),
     ]
   })
@@ -139,7 +147,7 @@ export async function soundcloudRelated(nativeId: string, nb = 30): Promise<FavI
   if (!/^\d+$/.test(nativeId)) return []
   return withCreds('soundcloud', async (c) => {
     const r = await scFetch(c, `/tracks/${nativeId}/related?limit=${nb}`).catch(() => null)
-    return ((r?.collection ?? []) as any[]).map((t) => scTrack(t))
+    return ((r?.collection ?? []) as any[]).filter(playable).map((t) => scTrack(t))
   })
 }
 
