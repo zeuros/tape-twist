@@ -3,7 +3,7 @@ import { booth, COLORS } from '../utils/booth'
 import { mixer } from '../utils/mixer'
 
 interface FxCommand {
-  action: 'eq' | 'color' | 'duck' | 'padVolume' | 'pitchUp' | 'pitchDown' | 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'gate' | 'slowmo' | 'flanger' | 'horn' | 'scratch' | 'stutter' | 'lights' | 'xy' | 'pad' | 'stopPads'
+  action: 'eq' | 'color' | 'duck' | 'padVolume' | 'pitchUp' | 'pitchDown' | 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'gate' | 'slowmo' | 'flanger' | 'siren' | 'scratch' | 'warble' | 'throw' | 'stutter' | 'lights' | 'xy' | 'pad' | 'stopPads'
   eq?: { low?: number; mid?: number; high?: number }
   color?: ColorPreset
   value?: number
@@ -41,7 +41,9 @@ export default defineEventHandler(async (event) => {
     case 'gate':
     case 'slowmo':
     case 'flanger':
-    case 'horn':
+    case 'siren':
+    case 'warble':
+    case 'throw':
     case 'scratch':
       booth.hold(c.action, !!c.on, from)
       break

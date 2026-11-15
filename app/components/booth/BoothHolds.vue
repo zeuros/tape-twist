@@ -2,7 +2,7 @@
 /** Hold buttons: they act while pressed, on every listening device (Talkover is in BoothVoice). */
 const { booth, held, holdStart, holdEnd } = useBooth()
 
-type Name = 'brake' | 'rewind' | 'build' | 'lights' | 'gate' | 'slowmo' | 'flanger' | 'horn' | 'scratch' | 'pitchUp' | 'pitchDown'
+type Name = 'brake' | 'rewind' | 'build' | 'lights' | 'gate' | 'slowmo' | 'flanger' | 'siren' | 'scratch' | 'warble' | 'throw' | 'pitchUp' | 'pitchDown'
 const HOLDS: { name: Name; emoji: string; label: string; title: string }[] = [
   { name: 'brake', emoji: '🛑', label: 'Brake', title: 'Hold: the music slows down to a stop like a turntable; let go to spin it back up' },
   { name: 'rewind', emoji: '⏪', label: 'Rewind', title: 'Hold: the music spins backwards, faster and faster; let go to drop back in' },
@@ -11,7 +11,9 @@ const HOLDS: { name: Name; emoji: string; label: string; title: string }[] = [
   { name: 'scratch', emoji: '🎚️', label: 'Scratch', title: 'Hold: the record is scratched back and forth, one stroke per beat; let go to drop back in' },
   { name: 'gate', emoji: '🫨', label: 'Gater', title: 'Hold: the music is chopped on 1/16 notes, in tempo' },
   { name: 'flanger', emoji: '🌀', label: 'Flanger', title: 'Hold: a jet sweep over the music, deeper the longer you hold' },
-  { name: 'horn', emoji: '📯', label: 'Air horn', title: 'Hold: an air horn, "bwa-bwa-bwa-bwaaa" each bar, until you let go' },
+  { name: 'warble', emoji: '🌊', label: 'Tape warble', title: 'Hold: the music wobbles like a stretched tape, more and more seasick; let go and it straightens' },
+  { name: 'throw', emoji: '🎯', label: 'Echo throw', title: 'Hold: the beat is caught into a long echo while the music drops out; let go and it comes back as the echoes trail off' },
+  { name: 'siren', emoji: '🚨', label: 'Dub siren', title: 'Hold: a dub siren whoops once per beat, with its own echo; let go and the echoes ring out' },
   { name: 'lights', emoji: '💡', label: 'Lights', title: "Hold: every listening phone's screen (this one too) flashes a new colour on each kick" },
 ]
 

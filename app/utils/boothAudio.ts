@@ -12,7 +12,7 @@
  *     └┬─ dry ────────────────┬─▶ duck ─▶ out (+ build-up riser, snare roll, drop) ─▶ limiter ─▶ speaker
  *      └─ colour ─▶ wet (+noise)┘                └─▶ kick meter (light show)
  *
- *   (between rewind and stutter: gater, slow-mo, flanger, scratch; the air horn joins at out:
+ *   (between rewind and stutter: tape warble, slow-mo, scratch, flanger, gater; the dub siren joins at out:
  *    app/utils/booth/moreHolds.ts)
  *
  *   fx context:                          pads ─▶ pad gain ─────────────────────────┬─▶ limiter ─▶ out
@@ -114,7 +114,7 @@ export class BoothAudio {
   private brakeGain: GainNode
   private rewindDelay: DelayNode
   private rewindGain: GainNode
-  /** Gater, slow-mo, flanger, air horn, scratch (app/utils/booth/moreHolds.ts). */
+  /** Warble, slow-mo, scratch, flanger, gater, dub siren (app/utils/booth/moreHolds.ts). */
   readonly holds2: MoreHolds
   private stDry: GainNode
   private stCap: GainNode
@@ -145,6 +145,10 @@ export class BoothAudio {
   private duckDb = 10
   private talkover = false
   private echoHeld = false
+  /** Echo throw held; the dry music it drops; the echo feedback the XY pad asks for. */
+  private throwing = false
+  private throwDry!: GainNode
+  private xyFb = ECHO_FEEDBACK
 
   /**
    * Call from a tap (browsers only start audio after a user gesture). The live player's
@@ -188,7 +192,7 @@ export class BoothAudio {
     this.stDelay = ctx.createDelay(2)
     this.stFb = gain(0)
     this.stWet = gain(0)
-    // More holds, between the rewind and the stutter (the air horn joins after the duck, below).
+    // More holds, between the rewind and the stutter (the dub siren joins after the duck, below).
     this.out = gain()
     this.holds2 = new MoreHolds(ctx, this.out)
     this.rewindGain.connect(this.holds2.input)
@@ -199,7 +203,8 @@ export class BoothAudio {
 
     // Music sum: the stream plus the echo returns.
     const music = gain()
-    head.connect(music)
+    this.throwDry = gain()
+    head.connect(this.throwDry).connect(music) // the echo throw drops this, leaving the echoes
 
     // Ping-pong echo: left repeats feed the right line and vice versa, darker and thinner each time.
     this.echoSend = gain(0)
@@ -472,7 +477,33 @@ export class BoothAudio {
   }
 
   private updateEcho() {
+    if (this.throwing) return // the throw has caught its beat and closed the send
     this.glide(this.echoSend.gain, Math.max(this.echoHeld ? 1 : 0, this.xyEcho), 0.015)
+  }
+
+  /**
+   * Echo throw held: the next ¾ beat goes into the ping-pong echo, then the music drops out and
+   * the echoes repeat on their own (feedback raised). Let go: the music back, the echoes trail off.
+   */
+  setEchoThrow(on: boolean, bpm: number) {
+    if (on === this.throwing) return
+    this.throwing = on
+    const t = this.ctx.currentTime
+    const send = this.echoSend.gain
+    const dry = this.throwDry.gain
+    send.cancelScheduledValues(t)
+    dry.cancelScheduledValues(t)
+    if (on) {
+      const caught = Math.min(0.6, (0.75 * 60) / bpm)
+      send.setTargetAtTime(1, t, 0.005)
+      send.setTargetAtTime(0, t + caught, 0.01)
+      dry.setTargetAtTime(0, t + caught, 0.02)
+      for (const g of this.echoFb) this.glide(g.gain, 0.78, 0.02)
+    } else {
+      dry.setTargetAtTime(1, t, 0.01)
+      for (const g of this.echoFb) this.glide(g.gain, this.xyFb, 0.3)
+      this.updateEcho()
+    }
   }
 
   /** Pitch ▲ / ▼ held (+1 / -1): the music bends that way; 0 glides it back (see MusicPitch). */
@@ -507,7 +538,8 @@ export class BoothAudio {
     this.glide(this.djHp.frequency, hp, tc)
     this.glide(this.djLp.Q, lpQ, tc)
     this.glide(this.djHp.Q, hpQ, tc)
-    for (const g of this.echoFb) this.glide(g.gain, fb, tc)
+    this.xyFb = fb
+    if (!this.throwing) for (const g of this.echoFb) this.glide(g.gain, fb, tc)
     this.updateEcho()
   }
 

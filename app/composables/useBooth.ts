@@ -1,6 +1,6 @@
 import { DEFAULT_BPM, DEFAULT_DUCK_DB, type BoothEvent, type BoothState, type ColorPreset, type Eq, type Pad, type XY } from '#shared/types/booth'
 
-type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'lights' | 'pitchUp' | 'pitchDown' | 'gate' | 'slowmo' | 'flanger' | 'horn' | 'scratch'
+type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'lights' | 'pitchUp' | 'pitchDown' | 'gate' | 'slowmo' | 'flanger' | 'siren' | 'scratch' | 'warble' | 'throw'
 
 /**
  * The booth (pads, holds, XY pad, colour, EQ). The server holds the shared state and relays
@@ -9,7 +9,7 @@ type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'lights' | 
  * devices follow within a few ms.
  */
 export const useBooth = defineSingleton(() => {
-  const booth = ref<BoothState>({ eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: DEFAULT_DUCK_DB, padVolume: 0.8, talkover: false, echo: false, brake: false, rewind: false, build: false, gate: false, slowmo: false, flanger: false, horn: false, scratch: false, stutter: null, xy: null, pads: [], lights: false, pitchUp: false, pitchDown: false, bpm: null })
+  const booth = ref<BoothState>({ eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: DEFAULT_DUCK_DB, padVolume: 0.8, talkover: false, echo: false, brake: false, rewind: false, build: false, gate: false, slowmo: false, flanger: false, siren: false, scratch: false, warble: false, throw: false, stutter: null, xy: null, pads: [], lights: false, pitchUp: false, pitchDown: false, bpm: null })
   const pads = ref<Pad[]>([])
   const fxError = ref('')
   /** Hold buttons pressed here count at once, before the server confirms. */
@@ -55,7 +55,9 @@ export const useBooth = defineSingleton(() => {
     a.holds2.setScratch(!!held.scratch || b.scratch, b.bpm ?? DEFAULT_BPM)
     a.holds2.setGate(!!held.gate || b.gate, b.bpm ?? DEFAULT_BPM)
     a.holds2.setFlanger(!!held.flanger || b.flanger)
-    a.holds2.setHorn(!!held.horn || b.horn, b.bpm ?? DEFAULT_BPM)
+    a.holds2.setSiren(!!held.siren || b.siren, b.bpm ?? DEFAULT_BPM)
+    a.holds2.setWarble(!!held.warble || b.warble)
+    a.setEchoThrow(!!held.throw || b.throw, b.bpm ?? DEFAULT_BPM)
     a.setStutter(stutterLocal.value ?? b.stutter, b.bpm ?? DEFAULT_BPM)
     a.setXY(xyLocal.value ?? b.xy)
   }

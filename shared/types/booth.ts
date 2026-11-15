@@ -35,11 +35,14 @@ export interface BoothState {
   /** XY filter pad while a finger is on it, else null. */
   xy: XY | null
   pads: string[] // playing now
-  /** More holds (app/utils/booth/moreHolds.ts): trance gate, slow-mo, flanger sweep, air horn, scratch. */
+  /** More holds (app/utils/booth/moreHolds.ts): trance gate, slow-mo, flanger sweep, dub siren, scratch, tape warble; and the echo throw. */
   gate: boolean
   slowmo: boolean
   flanger: boolean
-  horn: boolean
+  siren: boolean
+  warble: boolean
+  /** Echo throw: the beat caught into a long echo while the music drops out. */
+  throw: boolean
   scratch: boolean
   /** Light show: every listening phone's screen flashes on the kicks. */
   lights: boolean

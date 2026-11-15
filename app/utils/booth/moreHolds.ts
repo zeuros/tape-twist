@@ -1,16 +1,17 @@
 /**
- * Five more holds on the music (app/utils/boothAudio.ts), between the rewind and the stutter:
+ * Six more holds on the music (app/utils/boothAudio.ts), between the rewind and the stutter:
  *
- *   in ─▶ slow-mo delay ─▶ scratch delay ─┬─────────────────────┬─▶ gate ─▶ out
- *                                         └─ flanger (feedback) ┘
- *   air horn ─▶ hornOut (after the duck, like the build-up's sounds)
+ *   in ─▶ warble delay ─▶ slow-mo delay ─▶ scratch delay ─┬─────────────────────┬─▶ gate ─▶ out
+ *                                                         └─ flanger (feedback) ┘
+ *   dub siren ─▶ its echo ─▶ sirenOut (after the duck, like the build-up's sounds)
  *
  *  - Slow-mo: the delay grows at up to 0.3 s per second, so the music runs at 70 % speed (and
  *    pitch); let go, it speeds back up in 1 s, then cuts back to live.
  *  - Scratch: the record is pushed back and forth around the moment pressed, once per beat.
  *  - Gater: the volume chopped on 1/16 notes in tempo.
  *  - Flanger: a jet sweep that gets deeper the longer it's held.
- *  - Air horn: "bwa-bwa-bwa-bwaaa" each bar, synthesised.
+ *  - Dub siren: a rising "whoop" each beat, with its own echo.
+ *  - Tape warble: a seasick wow, deeper the longer it's held.
  */
 import { biquad, driveCurve, gainNode } from './dsp'
 
@@ -57,9 +58,14 @@ export class MoreHolds {
   private gate: GainNode
   private gateMod: GainNode
   private gateOsc: OscillatorNode | null = null
-  private horn: { nodes: AudioScheduledSourceNode[]; out: GainNode } | null = null
+  private siren: { nodes: AudioScheduledSourceNode[]; out: GainNode } | null = null
+  private sirenEcho: { input: GainNode; delay: DelayNode } | null = null
+  private warbleDelay: DelayNode
+  private warbleDepth: GainNode
+  private warbleLfo = false
+  private warbling = false
 
-  constructor(private ctx: AudioContext, private hornOut: AudioNode) {
+  constructor(private ctx: AudioContext, private sirenOut: AudioNode) {
     this.input = gainNode(ctx)
     this.output = gainNode(ctx)
     this.slowDelay = ctx.createDelay(MAX_DELAY + 1)
@@ -68,7 +74,11 @@ export class MoreHolds {
     this.scratchDelay = ctx.createDelay(MAX_DELAY + 1)
     this.scratchDelay.delayTime.value = 0
     this.scratchGain = gainNode(ctx)
-    this.input.connect(this.slowDelay).connect(this.slowGain).connect(this.scratchDelay).connect(this.scratchGain)
+    this.warbleDelay = ctx.createDelay(0.1)
+    this.warbleDelay.delayTime.value = 0
+    this.warbleDepth = gainNode(ctx, 0)
+    this.warbleDepth.connect(this.warbleDelay.delayTime)
+    this.input.connect(this.warbleDelay).connect(this.slowDelay).connect(this.slowGain).connect(this.scratchDelay).connect(this.scratchGain)
 
     // Flanger: a short delay swept by an LFO, fed back into itself, added to the dry music.
     this.flDelay = ctx.createDelay(0.02)
@@ -205,59 +215,82 @@ export class MoreHolds {
     }
   }
 
-  // ----------------------------------------------------------- air horn
+  // ---------------------------------------------------------- dub siren
 
-  /** Held: an air horn, "bwa-bwa-bwa-bwaaa" each bar, until let go. */
-  setHorn(on: boolean, bpm: number) {
-    if (on === !!this.horn) return
+  /**
+   * Held: a dub siren, "whoop" rising once per beat, through its own echo (3/4 beat, fed back);
+   * let go and the siren stops but its echoes ring out.
+   */
+  setSiren(on: boolean, bpm: number) {
+    if (on === !!this.siren) return
     const ctx = this.ctx
     const t = ctx.currentTime
+    const beat = 60 / bpm
+    if (!this.sirenEcho) {
+      const d = ctx.createDelay(2)
+      const fb = gainNode(ctx, 0.45)
+      const inp = gainNode(ctx)
+      inp.connect(this.sirenOut)
+      inp.connect(d).connect(biquad(ctx, 'lowpass', 2500)).connect(fb).connect(d)
+      fb.connect(this.sirenOut)
+      this.sirenEcho = { input: inp, delay: d }
+    }
+    this.sirenEcho.delay.delayTime.setValueAtTime(Math.min(1.9, beat * 0.75), t)
     if (on) {
       const out = gainNode(ctx, 0)
+      const osc = ctx.createOscillator()
+      osc.type = 'square'
+      osc.frequency.value = 800
+      const lfo = ctx.createOscillator()
+      lfo.type = 'sawtooth' // rising, then back down at once: whoop, whoop
+      lfo.frequency.value = bpm / 60
+      lfo.connect(gainNode(ctx, 350)).connect(osc.frequency) // 450–1150 Hz
       const shape = ctx.createWaveShaper()
-      shape.curve = driveCurve(3)
-      const tone = biquad(ctx, 'peaking', 1800, 1, 6)
-      out.connect(shape).connect(tone).connect(biquad(ctx, 'highpass', 200)).connect(gainNode(ctx, 0.25)).connect(this.hornOut)
-      const pitches = [466, 470, 587, 932]
-      const nodes = pitches.map((hz) => {
-        const o = ctx.createOscillator()
-        o.type = 'sawtooth'
-        o.frequency.value = hz
-        o.connect(out)
-        o.start(t)
-        return o
-      })
-      // One bar: three short blasts on the eighths, then a long one.
-      const beat = 60 / bpm
-      const blasts: [number, number][] = [[0, 0.35], [0.5, 0.35], [1, 0.35], [1.5, 2.2]]
-      const g = out.gain
-      g.setValueAtTime(0, t)
-      for (let bar = 0; bar < 16; bar++) {
-        for (const [at, len] of blasts) {
-          const s = t + (bar * 4 + at) * beat
-          g.setValueAtTime(0, s)
-          g.linearRampToValueAtTime(1, s + 0.01)
-          g.setValueAtTime(1, s + len * beat - 0.03)
-          g.linearRampToValueAtTime(0, s + len * beat)
-        }
-      }
-      // The long blast sags a little in pitch, like a can running low.
-      nodes.forEach((o, i) => {
-        const hz = pitches[i]!
-        for (let bar = 0; bar < 16; bar++) {
-          const s = t + (bar * 4 + 1.5) * beat
-          o.frequency.setValueAtTime(hz, s)
-          o.frequency.linearRampToValueAtTime(hz * 0.97, s + 2.2 * beat)
-          o.frequency.setValueAtTime(hz, s + 2.5 * beat)
-        }
-      })
-      this.horn = { nodes, out }
+      shape.curve = driveCurve(1.5)
+      osc.connect(biquad(ctx, 'lowpass', 3000)).connect(shape).connect(out).connect(this.sirenEcho.input)
+      out.gain.setValueAtTime(0, t)
+      out.gain.linearRampToValueAtTime(0.16, t + 0.02)
+      osc.start(t)
+      lfo.start(t)
+      this.siren = { nodes: [osc, lfo], out }
     } else {
-      const h = this.horn!
-      this.horn = null
+      const h = this.siren!
+      this.siren = null
       h.out.gain.cancelScheduledValues(0)
       h.out.gain.setTargetAtTime(0, t, 0.02)
       for (const n of h.nodes) n.stop(t + 0.15)
+    }
+  }
+
+  // -------------------------------------------------------- tape warble
+
+  /** Held: a seasick wow on the whole mix, deeper over 6 s; let go and it straightens in 1 s. */
+  setWarble(on: boolean) {
+    if (on === this.warbling) return
+    this.warbling = on
+    const ctx = this.ctx
+    const t = ctx.currentTime
+    if (!this.warbleLfo) {
+      // Two slow LFOs on the delay; at depth 0 the delay is 0, so nothing is late while idle.
+      for (const [hz, amt] of [[0.7, 1], [0.23, 0.6]] as const) {
+        const lfo = ctx.createOscillator()
+        lfo.frequency.value = hz
+        lfo.connect(gainNode(ctx, amt)).connect(this.warbleDepth)
+        lfo.start(t)
+      }
+      this.warbleLfo = true
+    }
+    const depth = 0.006 // s: the delay swings 0..3.2·depth (0–19 ms), about ±3 % in pitch at full depth
+    // The base delay always leads the swing (in faster, out slower), so the delay never asks
+    // for less than 0.
+    const ramps = [
+      [this.warbleDepth.gain, depth, 6, 0.8],
+      [this.warbleDelay.delayTime, depth * 1.6, 5, 1],
+    ] as const
+    for (const [p, v, tin, tout] of ramps) {
+      p.cancelScheduledValues(0)
+      p.setValueAtTime(p.value, t)
+      p.linearRampToValueAtTime(on ? v : 0, t + (on ? tin : tout))
     }
   }
 }
