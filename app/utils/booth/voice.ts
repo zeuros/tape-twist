@@ -1,19 +1,37 @@
 import type { VoicePreset } from '#shared/types/booth'
-import { biquad, funfairReverb, gainNode, wav } from './dsp'
+import { biquad, driveCurve, funfairReverb, gainNode, wav } from './dsp'
+import voiceWorkletUrl from '../../workers/voice.worklet.ts?worker&url'
+
+/** The voice worklets' module (auto-tune, and Talkover to the other devices), loaded once per context. */
+const loaded = new WeakMap<BaseAudioContext, Promise<void>>()
+export function addVoiceModule(ctx: BaseAudioContext) {
+  let p = loaded.get(ctx)
+  if (!p) loaded.set(ctx, (p = ctx.audioWorklet.addModule(voiceWorkletUrl)))
+  return p
+}
 
 /**
  * The booth voice: your mic (Talkover, also sent to the other devices) or a recorded pad, cleaned up
  * (low cut, presence, compressor), through a voice character (tannoy / robot / chipmunk /
- * monster), then a slapback and a funfair reverb.
+ * monster / megaphone / vocoder / auto-tune / underwater), then a slapback and a funfair reverb.
  *
  *   mic ─▶ cleanup ─▶ notches ─▶ voice preset ─▶ gate ─▶ level ─┬─────────────────▶ out
  *                                                              └─ slapback + reverb ┘
  */
 
-export const VOICE_PRESETS: VoicePreset[] = ['tannoy', 'robot', 'chipmunk', 'monster']
+export const VOICE_PRESETS: VoicePreset[] = ['tannoy', 'robot', 'chipmunk', 'monster', 'megaphone', 'vocoder', 'autotune', 'underwater']
 
 /** Slapback and reverb amounts: less tannoy room on the robot, a little less on the shifted voices. */
-const ROOM: Record<VoicePreset, readonly [number, number]> = { tannoy: [0.35, 0.55], robot: [0.12, 0.25], chipmunk: [0.25, 0.4], monster: [0.25, 0.45] }
+const ROOM: Record<VoicePreset, readonly [number, number]> = {
+  tannoy: [0.35, 0.55],
+  robot: [0.12, 0.25],
+  chipmunk: [0.25, 0.4],
+  monster: [0.25, 0.45],
+  megaphone: [0.3, 0.3], // a street, not a hall
+  vocoder: [0.15, 0.35],
+  autotune: [0.2, 0.35],
+  underwater: [0.05, 0.6], // all reverb, no slap
+}
 const MAX_NOTCHES = 6
 
 /** Low cut (feeds back first), optional larsen notches, presence, top cut, compressor. */
@@ -75,13 +93,107 @@ function voicePreset(ctx: BaseAudioContext, p: VoicePreset) {
     const up = pitchShifter(ctx, 7)
     input.connect(up.input)
     up.output.connect(output)
-  } else {
-    // Monster: down a tritone, more chest.
+  } else if (p === 'monster') {
+    // Down a tritone, more chest.
     const down = pitchShifter(ctx, -6)
     input.connect(down.input)
     down.output.connect(biquad(ctx, 'lowshelf', 220, Math.SQRT1_2, 7)).connect(output)
+  } else if (p === 'megaphone') {
+    megaphone(ctx, input, output)
+  } else if (p === 'vocoder') {
+    vocoder(ctx, input, output)
+  } else if (p === 'autotune') {
+    // The worklet's module loads in the background: silent until then (`ready` for offline renders).
+    const ready = addVoiceModule(ctx).then(() => {
+      input.connect(new AudioWorkletNode(ctx, 'voice-autotune', { outputChannelCount: [1] })).connect(output)
+    })
+    return { input, output, ready }
+  } else {
+    underwater(ctx, input, output)
   }
-  return { input, output }
+  return { input, output, ready: Promise.resolve() }
+}
+
+/** A loudhailer: a narrow, honky band, driven into distortion, then cut again. */
+function megaphone(ctx: BaseAudioContext, input: AudioNode, output: AudioNode) {
+  const drive = ctx.createWaveShaper()
+  drive.curve = driveCurve(5)
+  drive.oversample = '2x'
+  input
+    .connect(gainNode(ctx, 2.5))
+    .connect(biquad(ctx, 'highpass', 550, 0.9))
+    .connect(biquad(ctx, 'peaking', 1700, 1.2, 9))
+    .connect(drive)
+    .connect(biquad(ctx, 'lowpass', 3800, 1.1))
+    .connect(biquad(ctx, 'highpass', 450))
+    .connect(gainNode(ctx, 0.2)) // the distortion is dense: as loud as the tannoy at a lower peak
+    .connect(output)
+}
+
+/** The vocoder's chord (A minor, low): the voice "plays" it. */
+const VOCODER_NOTES = [110, 164.81, 220, 261.63, 329.63]
+const VOCODER_BANDS = 16
+
+/**
+ * Channel vocoder: the voice is split into 16 bands; each band's level (rectified, smoothed)
+ * opens the same band of a sawtooth chord, so the chord speaks with the voice's vowels. A
+ * little of the voice's top (the s and t) is mixed back in, or the words get hard to follow.
+ */
+function vocoder(ctx: BaseAudioContext, input: AudioNode, output: AudioNode) {
+  const carrier = gainNode(ctx, 1 / VOCODER_NOTES.length)
+  for (const [i, f] of VOCODER_NOTES.entries()) {
+    const o = ctx.createOscillator()
+    o.type = 'sawtooth'
+    o.frequency.value = f
+    o.detune.value = (i % 2 ? 1 : -1) * 6 // a little width
+    o.connect(carrier)
+    o.start()
+  }
+  const rectify = new Float32Array(1025).map((_, i) => Math.abs(i / 512 - 1))
+  const bandsOut = gainNode(ctx, 1)
+  const lo = 140
+  const hi = 6500
+  for (let b = 0; b < VOCODER_BANDS; b++) {
+    const f = lo * Math.pow(hi / lo, b / (VOCODER_BANDS - 1))
+    const q = 7
+    // Voice band → level.
+    const env = ctx.createWaveShaper()
+    env.curve = rectify
+    input.connect(biquad(ctx, 'bandpass', f, q)).connect(env)
+    const smooth = biquad(ctx, 'lowpass', 35)
+    env.connect(smooth)
+    // Chord band, opened by that level (the gain's own value is 0: only the level counts).
+    const vca = gainNode(ctx, 0)
+    smooth.connect(gainNode(ctx, VOCODER_GAIN)).connect(vca.gain)
+    carrier.connect(biquad(ctx, 'bandpass', f, q)).connect(vca).connect(bandsOut)
+  }
+  bandsOut.connect(output)
+  input.connect(biquad(ctx, 'highpass', 5000)).connect(gainNode(ctx, 0.5)).connect(output)
+}
+/** How far a band's level opens its chord band (tuned so the vocoder is as loud as the tannoy). */
+const VOCODER_GAIN = 23
+
+/** Under water: muffled, wobbling (a slow, deep chorus) and bubbling (a dark, swirling echo). */
+function underwater(ctx: BaseAudioContext, input: AudioNode, output: AudioNode) {
+  const muffled = biquad(ctx, 'lowpass', 650, 3)
+  input.connect(biquad(ctx, 'peaking', 350, 1, 4)).connect(muffled)
+  const wobble = (rate: number, depth: number, base: number) => {
+    const d = ctx.createDelay(0.1)
+    d.delayTime.value = base
+    const lfo = ctx.createOscillator()
+    lfo.frequency.value = rate
+    lfo.connect(gainNode(ctx, depth)).connect(d.delayTime)
+    lfo.start()
+    return d
+  }
+  for (const [rate, depth, base] of [[0.9, 0.006, 0.02], [1.37, 0.008, 0.028]] as const) {
+    muffled.connect(wobble(rate, depth, base)).connect(gainNode(ctx, 0.5)).connect(output)
+  }
+  const bubbles = wobble(3.1, 0.004, 0.07)
+  const fb = gainNode(ctx, 0.45)
+  muffled.connect(bubbles).connect(biquad(ctx, 'lowpass', 500)).connect(fb).connect(bubbles)
+  fb.connect(gainNode(ctx, 0.5)).connect(output)
+  muffled.connect(gainNode(ctx, 0.35)).connect(output)
 }
 
 /**
@@ -134,7 +246,11 @@ export class VoiceChannel {
   private notches: BiquadFilterNode[]
   private nextNotch = 0
   private analyser: AnalyserNode
-  private presetGains = {} as Record<VoicePreset, GainNode>
+  private clean: { input: AudioNode; output: AudioNode }
+  private presetsOut: GainNode
+  /** Each voice character, built the first time it's picked; only the chosen one gets the voice. */
+  private presets = new Map<VoicePreset, { input: AudioNode; gain: GainNode }>()
+  private preset: VoicePreset | null = null
   private slapOut: GainNode
   private verbOut: GainNode
   private mic: MediaStream | null = null
@@ -151,22 +267,12 @@ export class VoiceChannel {
   constructor(private ctx: AudioContext, out: AudioNode) {
     this.head = gainNode(ctx)
     this.notches = Array.from({ length: MAX_NOTCHES }, () => biquad(ctx, 'notch', 20, 30)) // 20 Hz = idle
-    const clean = voiceCleanup(ctx, this.notches)
+    const clean = (this.clean = voiceCleanup(ctx, this.notches))
     this.head.connect(clean.input)
     this.gate = gainNode(ctx, 0)
     this.level = gainNode(ctx)
-    // Voice presets, crossfaded: only the chosen one is open.
-    const presetsOut = gainNode(ctx)
-    for (const p of VOICE_PRESETS) {
-      this.presetGains[p] = gainNode(ctx, p === 'tannoy' ? 1 : 0)
-      this.presetGains[p].connect(presetsOut)
-    }
-    for (const p of VOICE_PRESETS) {
-      const v = voicePreset(ctx, p)
-      clean.output.connect(v.input)
-      v.output.connect(this.presetGains[p])
-    }
-    presetsOut.connect(this.gate).connect(this.level)
+    this.presetsOut = gainNode(ctx)
+    this.presetsOut.connect(this.gate).connect(this.level)
     this.bus = gainNode(ctx)
     this.bus.connect(out)
     ;({ slapOut: this.slapOut, verbOut: this.verbOut } = tannoyRoom(ctx, this.level, this.bus))
@@ -176,15 +282,39 @@ export class VoiceChannel {
     this.analyser.fftSize = 4096
     this.analyser.smoothingTimeConstant = 0
     clean.output.connect(this.analyser)
+    this.setPreset('tannoy')
   }
 
   private glide(p: AudioParam, v: number, tc: number) {
     p.setTargetAtTime(v, this.ctx.currentTime, tc)
   }
 
+  /** Crossfades to voice character `p`; the previous one is cut off once faded (no CPU left on it). */
   setPreset(p: VoicePreset) {
-    if (!VOICE_PRESETS.includes(p)) return
-    for (const k of VOICE_PRESETS) this.glide(this.presetGains[k].gain, k === p ? 1 : 0, 0.03)
+    if (!VOICE_PRESETS.includes(p) || p === this.preset) return
+    let next = this.presets.get(p)
+    if (!next) {
+      const v = voicePreset(this.ctx, p)
+      const gain = gainNode(this.ctx, 0)
+      v.output.connect(gain).connect(this.presetsOut)
+      this.presets.set(p, (next = { input: v.input, gain }))
+    }
+    this.clean.output.connect(next.input)
+    this.glide(next.gain.gain, 1, 0.03)
+    const prevName = this.preset
+    const prev = prevName && this.presets.get(prevName)
+    if (prev) {
+      this.glide(prev.gain.gain, 0, 0.03)
+      setTimeout(() => {
+        if (this.preset === prevName) return // picked again meanwhile
+        try {
+          this.clean.output.disconnect(prev.input)
+        } catch {
+          /* already */
+        }
+      }, 300)
+    }
+    this.preset = p
     const [slap, verb] = ROOM[p]
     this.glide(this.slapOut.gain, slap, 0.03)
     this.glide(this.verbOut.gain, verb, 0.03)
@@ -292,6 +422,7 @@ export async function renderVoicePad(recording: Blob, p: VoicePreset): Promise<B
   player.connect(clean.input)
   const v = voicePreset(ctx, p)
   clean.output.connect(v.input)
+  await v.ready
   // The tail fades out so the reverb doesn't end in a cut.
   const out = ctx.createGain()
   const end = src.duration + tail

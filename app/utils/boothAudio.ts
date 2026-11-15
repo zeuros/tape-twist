@@ -19,10 +19,9 @@
 import type { ColorPreset, Eq, VoicePreset, XY } from '#shared/types/booth'
 import { biquad, dbToGain, driveCurve, gainNode, noiseBuffer, softLimitCurve } from './booth/dsp'
 import { measureRoom } from './booth/autoSync'
-import { VoiceChannel } from './booth/voice'
+import { addVoiceModule, VoiceChannel } from './booth/voice'
 import { MusicPitch } from './booth/pitch'
 import { voiceLink } from './voiceLink'
-import voiceWorkletUrl from '../workers/voice.worklet.ts?worker&url'
 
 /** Talkover keeps sending this long after release: the reverb's tail. */
 const VOICE_TAIL_MS = 1500
@@ -283,7 +282,7 @@ export class BoothAudio {
   private async linkVoices(fxOut: GainNode) {
     const fx = this.fx
     try {
-      await fx.audioWorklet.addModule(voiceWorkletUrl)
+      await addVoiceModule(fx)
     } catch {
       return // no AudioWorklet: the voice stays on this device
     }

@@ -2,7 +2,9 @@
  * Talkover to every device (app/utils/voiceLink.ts), logic in app/utils/voiceJitter.ts:
  *   'voice-capture': this device's voice in, 16 kHz frames out over the port while on.
  *   'voice-player': the other devices' frames in over the port, their voices out.
+ *   'voice-autotune': the auto-tune voice preset (app/utils/booth/autotune.ts).
  */
+import { AutoTuneCore } from '../utils/booth/autotune'
 import { VoiceFramer, VoiceMixCore } from '../utils/voiceJitter'
 
 declare const sampleRate: number
@@ -44,5 +46,19 @@ class VoicePlayer extends AudioWorkletProcessor {
   }
 }
 
+class VoiceAutoTune extends AudioWorkletProcessor {
+  private core = new AutoTuneCore(sampleRate)
+
+  process(inputs: Float32Array[][], outputs: Float32Array[][]) {
+    const x = inputs[0]?.[0]
+    const y = outputs[0]![0]!
+    if (!x) return true // nothing connected right now (another voice picked): no work
+    y.set(x)
+    this.core.process(y)
+    return true
+  }
+}
+
 registerProcessor('voice-capture', VoiceCapture)
+registerProcessor('voice-autotune', VoiceAutoTune)
 registerProcessor('voice-player', VoicePlayer)

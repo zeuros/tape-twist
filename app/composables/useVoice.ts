@@ -5,6 +5,10 @@ export const VOICES: { id: VoicePreset; label: string }[] = [
   { id: 'robot', label: '🤖 Robot' },
   { id: 'chipmunk', label: '🐿️ Chipmunk' },
   { id: 'monster', label: '👹 Monster' },
+  { id: 'megaphone', label: '📣 Megaphone' },
+  { id: 'vocoder', label: '🎹 Vocoder' },
+  { id: 'autotune', label: '🎶 Auto-tune' },
+  { id: 'underwater', label: '🫧 Underwater' },
 ]
 
 /**
