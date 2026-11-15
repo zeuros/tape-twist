@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** The booth: pads, voice, holds, XY pad, colour, EQ and the engine's safety settings. */
 const { booth, fxError, stopPads, setFxValue, setColor } = useBooth()
-const { voicePreset, voiceVolume, setPreset, setVolume } = useVoice()
+const { voiceVolume, setVolume } = useVoice()
 const COLORS = [
   { id: 'off', label: 'Clean', emoji: '✨' },
   { id: 'radio', label: 'Old radio', emoji: '📻' },
@@ -22,9 +22,7 @@ const num = (e: Event) => Number((e.target as HTMLInputElement).value)
     <p v-if="fxError" class="err">{{ fxError }}</p>
 
     <BoothPads />
-    <div class="seg voice-seg" role="group" aria-label="Voice for Talkover and recorded pads" title="Your voice, for Talkover and for the pads you record">
-      <button v-for="v in VOICES" :key="v.id" :class="{ on: voicePreset === v.id }" @click="setPreset(v.id)">{{ v.label }}</button>
-    </div>
+    <BoothVoice />
     <label class="slider-row">
       <span>Pads volume</span>
       <input type="range" min="0" max="1.5" step="0.05" :value="booth.padVolume" @change="setFxValue('padVolume', num($event))">

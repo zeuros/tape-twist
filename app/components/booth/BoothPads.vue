@@ -106,7 +106,7 @@ async function addInstant() {
       v-else
       class="pad rec"
       :class="{ live: rec.recording.value }"
-      title="Hold and speak (4 s max): it becomes a pad, with the voice picked below"
+      title="Hold and speak (4 s max): it becomes a pad, with the voice you pick in the pop-up"
       @pointerdown="recDown"
       @pointerup="rec.stop"
       @pointercancel="rec.stop"
@@ -115,6 +115,10 @@ async function addInstant() {
       <span class="pad-emoji">{{ rec.recording.value ? '⏺️' : '🔴' }}</span>
       <span class="pad-label">{{ rec.recording.value ? 'Recording…' : 'Hold to record' }}</span>
     </button>
+    <div v-if="rec.recording.value || rec.take.value" class="rec-voices" role="dialog" aria-label="Voice for this pad">
+      <p>{{ rec.recording.value ? 'Recording… pick its voice' : 'Its voice (then name it and ✓)' }}</p>
+      <BoothVoiceMatrix v-model="rec.preset.value" />
+    </div>
     <form class="instant-add" @submit.prevent="addInstant">
       <input v-model="instantUrl" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="Paste a myinstants.com link" aria-label="myinstants link" enterkeyhint="go" :disabled="adding">
       <button type="submit" class="ghost sm" :disabled="adding" :title="instantUrl.trim() ? 'Add this sound as a pad' : 'Open myinstants.com to find a sound'">
