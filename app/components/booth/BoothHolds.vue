@@ -2,11 +2,16 @@
 /** Hold buttons: they act while pressed, on every listening device (Talkover is in BoothVoice). */
 const { booth, held, holdStart, holdEnd } = useBooth()
 
-type Name = 'brake' | 'rewind' | 'build' | 'lights' | 'pitchUp' | 'pitchDown'
+type Name = 'brake' | 'rewind' | 'build' | 'lights' | 'gate' | 'slowmo' | 'flanger' | 'horn' | 'scratch' | 'pitchUp' | 'pitchDown'
 const HOLDS: { name: Name; emoji: string; label: string; title: string }[] = [
   { name: 'brake', emoji: '🛑', label: 'Brake', title: 'Hold: the music slows down to a stop like a turntable; let go to spin it back up' },
   { name: 'rewind', emoji: '⏪', label: 'Rewind', title: 'Hold: the music spins backwards, faster and faster; let go to drop back in' },
   { name: 'build', emoji: '🚀', label: 'Build-up', title: 'Hold: the bass fades away, a riser and a snare roll climb for four bars; let go for the drop' },
+  { name: 'slowmo', emoji: '🐌', label: 'Slow-mo', title: 'Hold: the music slows to 70 % speed, lower and lazier; let go and it speeds back up' },
+  { name: 'scratch', emoji: '🎚️', label: 'Scratch', title: 'Hold: the record is scratched back and forth, one stroke per beat; let go to drop back in' },
+  { name: 'gate', emoji: '🫨', label: 'Gater', title: 'Hold: the music is chopped on 1/16 notes, in tempo' },
+  { name: 'flanger', emoji: '🌀', label: 'Flanger', title: 'Hold: a jet sweep over the music, deeper the longer you hold' },
+  { name: 'horn', emoji: '📯', label: 'Air horn', title: 'Hold: an air horn, "bwa-bwa-bwa-bwaaa" each bar, until you let go' },
   { name: 'lights', emoji: '💡', label: 'Lights', title: "Hold: every listening phone's screen (this one too) flashes a new colour on each kick" },
 ]
 

@@ -3,7 +3,7 @@ import { booth, COLORS } from '../utils/booth'
 import { mixer } from '../utils/mixer'
 
 interface FxCommand {
-  action: 'eq' | 'color' | 'duck' | 'padVolume' | 'pitchUp' | 'pitchDown' | 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'stutter' | 'lights' | 'xy' | 'pad' | 'stopPads'
+  action: 'eq' | 'color' | 'duck' | 'padVolume' | 'pitchUp' | 'pitchDown' | 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'gate' | 'slowmo' | 'flanger' | 'horn' | 'scratch' | 'stutter' | 'lights' | 'xy' | 'pad' | 'stopPads'
   eq?: { low?: number; mid?: number; high?: number }
   color?: ColorPreset
   value?: number
@@ -37,7 +37,14 @@ export default defineEventHandler(async (event) => {
     case 'echo': booth.hold('echo', !!c.on, from); break
     case 'brake': booth.hold('brake', !!c.on, from); break
     case 'rewind': booth.hold('rewind', !!c.on, from); break
-    case 'build': booth.hold('build', !!c.on, from); break
+    case 'build':
+    case 'gate':
+    case 'slowmo':
+    case 'flanger':
+    case 'horn':
+    case 'scratch':
+      booth.hold(c.action, !!c.on, from)
+      break
     case 'stutter': booth.setStutter(c.on === false ? null : Number(c.value), from); break
     case 'lights': booth.hold('lights', !!c.on, from); break
     case 'pitchUp': booth.hold('pitchUp', !!c.on, from); break

@@ -32,11 +32,11 @@ export interface PadInfo extends Pad {
 type PadEntry = Omit<PadInfo, 'durationSec'>
 
 type Persisted = Pick<BoothState, 'eq' | 'color' | 'duckDb' | 'padVolume'>
-export type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'lights' | 'pitchUp' | 'pitchDown'
+export type HoldName = 'talkover' | 'echo' | 'brake' | 'rewind' | 'build' | 'lights' | 'pitchUp' | 'pitchDown' | 'gate' | 'slowmo' | 'flanger' | 'horn' | 'scratch'
 
 class Booth {
   private s: Persisted = { eq: { low: 0, mid: 0, high: 0 }, color: 'off', duckDb: DEFAULT_DUCK_DB, padVolume: 0.8 }
-  private holds = { talkover: 0, echo: 0, brake: 0, rewind: 0, build: 0, lights: 0, pitchUp: 0, pitchDown: 0, stutter: 0, xy: 0 }
+  private holds = { talkover: 0, echo: 0, brake: 0, rewind: 0, build: 0, lights: 0, pitchUp: 0, pitchDown: 0, gate: 0, slowmo: 0, flanger: 0, horn: 0, scratch: 0, stutter: 0, xy: 0 }
   private xy: XY | null = null
   private stutter: number | null = null
   private holdTimers: Record<string, ReturnType<typeof setTimeout>> = {}
@@ -61,6 +61,11 @@ class Booth {
       brake: now < this.holds.brake,
       rewind: now < this.holds.rewind,
       build: now < this.holds.build,
+      gate: now < this.holds.gate,
+      slowmo: now < this.holds.slowmo,
+      flanger: now < this.holds.flanger,
+      horn: now < this.holds.horn,
+      scratch: now < this.holds.scratch,
       stutter: now < this.holds.stutter ? this.stutter : null,
       xy: now < this.holds.xy ? this.xy : null,
       pads: [...this.playing.keys()],

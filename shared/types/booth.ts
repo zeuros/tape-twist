@@ -35,6 +35,12 @@ export interface BoothState {
   /** XY filter pad while a finger is on it, else null. */
   xy: XY | null
   pads: string[] // playing now
+  /** More holds (app/utils/booth/moreHolds.ts): trance gate, slow-mo, flanger sweep, air horn, scratch. */
+  gate: boolean
+  slowmo: boolean
+  flanger: boolean
+  horn: boolean
+  scratch: boolean
   /** Light show: every listening phone's screen flashes on the kicks. */
   lights: boolean
   /** Tempo of the music, measured on the server (null: unsure). */

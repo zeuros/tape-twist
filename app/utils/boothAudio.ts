@@ -12,6 +12,9 @@
  *     └┬─ dry ────────────────┬─▶ duck ─▶ out (+ build-up riser, snare roll, drop) ─▶ limiter ─▶ speaker
  *      └─ colour ─▶ wet (+noise)┘                └─▶ kick meter (light show)
  *
+ *   (between rewind and stutter: gater, slow-mo, flanger, scratch; the air horn joins at out:
+ *    app/utils/booth/moreHolds.ts)
+ *
  *   fx context:                          pads ─▶ pad gain ─────────────────────────┬─▶ limiter ─▶ out
  *   mic (talkover, also sent to the others) ─▶ voice chain (app/utils/booth/voice.ts) ─────┘
  */
@@ -22,6 +25,7 @@ import { measureRoom } from './booth/autoSync'
 import { addVoiceModule, VoiceChannel } from './booth/voice'
 import { sendVoice } from './booth/talkSender'
 import { MusicPitch } from './booth/pitch'
+import { MoreHolds } from './booth/moreHolds'
 import { voiceLink } from './voiceLink'
 
 /** The other devices' Talkover, louder than this device's own voice (it comes over the music). */
@@ -110,6 +114,8 @@ export class BoothAudio {
   private brakeGain: GainNode
   private rewindDelay: DelayNode
   private rewindGain: GainNode
+  /** Gater, slow-mo, flanger, air horn, scratch (app/utils/booth/moreHolds.ts). */
+  readonly holds2: MoreHolds
   private stDry: GainNode
   private stCap: GainNode
   private stDelay: DelayNode
@@ -182,8 +188,13 @@ export class BoothAudio {
     this.stDelay = ctx.createDelay(2)
     this.stFb = gain(0)
     this.stWet = gain(0)
-    this.rewindGain.connect(this.stDry).connect(head)
-    this.rewindGain.connect(this.stCap).connect(this.stDelay).connect(this.stWet).connect(head)
+    // More holds, between the rewind and the stutter (the air horn joins after the duck, below).
+    this.out = gain()
+    this.holds2 = new MoreHolds(ctx, this.out)
+    this.rewindGain.connect(this.holds2.input)
+    const held = this.holds2.output
+    held.connect(this.stDry).connect(head)
+    held.connect(this.stCap).connect(this.stDelay).connect(this.stWet).connect(head)
     this.stDelay.connect(this.stFb).connect(this.stDelay)
 
     // Music sum: the stream plus the echo returns.
@@ -260,7 +271,6 @@ export class BoothAudio {
     this.colorMerge.connect(this.drive)
 
     // Music out; a soft limiter keeps it from clipping.
-    this.out = gain()
     this.duck.connect(this.out)
     const pre = (this.preOut = gain(0.5))
     const limiter = ctx.createWaveShaper()
