@@ -192,11 +192,13 @@ class Mixer {
       p.setValueAtTime(r.to, now)
       return
     }
+    // Short linear ramps, never setValueCurveAtTime: a value set while a curve still runs (the
+    // fade's end lands a few ms early on the graph's clock, or a skip cuts a fade) kills
+    // node-web-audio-api's render thread for good, silently. That froze the mix on fades.
     const n = 64
-    const curve = new Float32Array(n)
     const tStart = performance.now()
-    for (let i = 0; i < n; i++) curve[i] = rampValue(r, tStart + (i / (n - 1)) * left * 1000)
-    p.setValueCurveAtTime(curve, now, left)
+    p.setValueAtTime(rampValue(r, tStart), now)
+    for (let i = 1; i <= n; i++) p.linearRampToValueAtTime(rampValue(r, tStart + (i / n) * left * 1000), now + (i / n) * left)
   }
 
   /** Per-deck low-band level (dB), used by the engine for bass swaps. */
@@ -307,8 +309,9 @@ class Mixer {
   private watchdog: ReturnType<typeof setInterval> | undefined
 
   /**
-   * The native render thread can deadlock (seen after ~30 min: blocked on a futex, no more
-   * callbacks) while capture and everything else keep running: the phones then hang on
+   * The native render thread can die (seen after ~30 min: blocked on a futex, no more
+   * callbacks; one cause found: a value set over a running gain curve, see scheduleRamp)
+   * while capture and everything else keep running: the phones then hang on
    * "Connecting". If no audio comes out for 2 s while the decks are being captured,
    * rebuild the pipeline; the phones reconnect by themselves.
    */
