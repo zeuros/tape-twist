@@ -1,14 +1,11 @@
 <script setup lang="ts">
 import type { Pad } from '#shared/types/booth'
 
-/** The soundboard, and the tile that records a new pad (then asks its name inline). */
+/** The soundboard (pads are recorded in the Voice section, BoothVoice). */
 const { booth, pads, hitPad, deletePad, reloadPads, showFxError } = useBooth()
 const builtIn = computed(() => pads.value.filter((p) => !p.recorded))
 const custom = computed(() => pads.value.filter((p) => p.recorded))
-const rec = usePadRecorder()
 const { armed, confirm } = useConfirmTap()
-const nameEl = ref<HTMLInputElement | null>(null)
-watch(rec.take, (t) => t && nextTick(() => nameEl.value?.select()))
 
 // Pads fire on press with a mouse (instant), but on a touch screen only on a real tap:
 // lifting the finger where it went down. A finger that scrolls the page doesn't fire.
@@ -28,12 +25,6 @@ function padUp(e: PointerEvent, p: Pad) {
   const t = touches.get(e.pointerId)
   touches.delete(e.pointerId)
   if (t && Math.hypot(e.clientX - t.x, e.clientY - t.y) <= TAP_SLOP) hitPad(p)
-}
-
-function recDown(e: PointerEvent) {
-  e.preventDefault()
-  capturePointer(e)
-  void rec.start()
 }
 
 function onDelete(p: Pad) {
@@ -77,7 +68,7 @@ async function addInstant() {
         <span class="pad-label">{{ p.label }}</span>
       </button>
     </div>
-    <div class="pads-sep" role="separator"><span>Yours</span></div>
+    <div v-if="custom.length" class="pads-sep" role="separator"><span>Yours</span></div>
     <div v-for="p in custom" :key="p.id" class="pad-wrap">
       <button
         class="pad"
@@ -94,30 +85,6 @@ async function addInstant() {
         <span class="pad-label">{{ p.label }}</span>
       </button>
       <button v-if="p.recorded" class="pad-del" :class="{ armed: armed === p.id }" :title="`Delete ${p.label}`" :aria-label="`Delete ${p.label}`" @click="onDelete(p)">{{ armed === p.id ? 'Delete?' : '✕' }}</button>
-    </div>
-    <form v-if="rec.take.value" class="pad rec-name" @submit.prevent="rec.save">
-      <input ref="nameEl" v-model="rec.name.value" maxlength="30" aria-label="Pad name" enterkeyhint="done" :disabled="rec.saving.value">
-      <span class="rec-actions">
-        <button type="button" class="ghost sm" title="Discard" :disabled="rec.saving.value" @click="rec.discard">✕</button>
-        <button type="submit" class="ghost sm" title="Save the pad" :disabled="rec.saving.value">{{ rec.saving.value ? '⏳' : '✓' }}</button>
-      </span>
-    </form>
-    <button
-      v-else
-      class="pad rec"
-      :class="{ live: rec.recording.value }"
-      title="Hold and speak (4 s max): it becomes a pad, with the voice you pick in the pop-up"
-      @pointerdown="recDown"
-      @pointerup="rec.stop"
-      @pointercancel="rec.stop"
-      @contextmenu.prevent
-    >
-      <span class="pad-emoji">{{ rec.recording.value ? '⏺️' : '🔴' }}</span>
-      <span class="pad-label">{{ rec.recording.value ? 'Recording…' : 'Hold to record' }}</span>
-    </button>
-    <div v-if="rec.recording.value || rec.take.value" class="rec-voices" role="dialog" aria-label="Voice for this pad">
-      <p>{{ rec.recording.value ? 'Recording… pick its voice' : 'Its voice (then name it and ✓)' }}</p>
-      <BoothVoiceMatrix v-model="rec.preset.value" />
     </div>
     <form class="instant-add" @submit.prevent="addInstant">
       <input v-model="instantUrl" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="Paste a myinstants.com link" aria-label="myinstants link" enterkeyhint="go" :disabled="adding">

@@ -3,8 +3,8 @@ import { renderVoicePad } from '~/utils/booth/voice'
 const MAX_SEC = 4
 
 /**
- * Record a pad: hold the tile, speak, let go (4 s max), name it. It gets this device's voice
- * (the voice picked in the pop-up, slapback, reverb), is trimmed on the server and becomes a pad on every page.
+ * Record a pad: hold the Voice section's button ("Record a pad" ticked), speak, let go (4 s max), name it. It gets this device's voice
+ * (the voice picked in the Voice section, slapback, reverb), is trimmed on the server and becomes a pad on every page.
  *
  * Naming happens inline, not in a prompt(): a dialog freezes the page, and with it the live
  * stream it feeds (the music stopped while the dialog was open).
@@ -16,8 +16,6 @@ export function usePadRecorder() {
   const take = shallowRef<Blob | null>(null)
   const name = ref('')
   const saving = ref(false)
-  /** The voice this pad gets: picked in the pop-up while recording (starts as Talkover's). */
-  const preset = ref(useVoice().voicePreset.value)
   let wanted = false
   let recorder: MediaRecorder | null = null
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -28,7 +26,6 @@ export function usePadRecorder() {
       return showFxError(window.isSecureContext ? 'This browser cannot record.' : 'Recording needs the https:// address.')
     }
     wanted = true
-    if (!take.value) preset.value = useVoice().voicePreset.value
     let stream: MediaStream
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true } })
@@ -72,7 +69,7 @@ export function usePadRecorder() {
     if (!blob || saving.value) return
     saving.value = true
     try {
-      const body = await renderVoicePad(blob, preset.value).catch((e) => {
+      const body = await renderVoicePad(blob, useVoice().voicePreset.value).catch((e) => {
         console.error('[pads] voice render', e)
         return blob
       })
@@ -90,5 +87,5 @@ export function usePadRecorder() {
 
   onBeforeUnmount(stop)
 
-  return { recording, take, name, saving, preset, start, stop, save, discard }
+  return { recording, take, name, saving, start, stop, save, discard }
 }

@@ -21,21 +21,24 @@ const num = (e: Event) => Number((e.target as HTMLInputElement).value)
     </div>
     <p v-if="fxError" class="err">{{ fxError }}</p>
 
+    <h3>Pads</h3>
     <BoothPads />
-    <BoothVoice />
     <label class="slider-row">
       <span>Pads volume</span>
       <input type="range" min="0" max="1.5" step="0.05" :value="booth.padVolume" @change="setFxValue('padVolume', num($event))">
     </label>
 
-    <BoothHolds />
-    <BoothStutter />
-    <BoothXyPad />
-
+    <h3>Voice</h3>
+    <BoothVoice />
     <label class="slider-row">
       <span>Voice volume</span>
       <input type="range" min="0" max="2" step="0.05" :value="voiceVolume" @change="setVolume(num($event))">
     </label>
+
+    <h3>Holds</h3>
+    <BoothHolds />
+    <BoothStutter />
+    <BoothXyPad />
 
     <h3>Colour</h3>
     <div class="seg">
