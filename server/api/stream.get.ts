@@ -14,5 +14,11 @@ export default defineEventHandler(async (event) => {
     'x-stream-epoch': String(epoch),
   })
   event.node.req.on('close', () => out.destroy())
+  // The mixer drops a listener with destroy() (restart, or too far behind): that only emits
+  // 'close', never 'end', so sendStream would leave the response open and the page waiting on
+  // it for ever. End it: the page sees the stream end and reconnects in 2 s.
+  out.on('close', () => {
+    if (!event.node.res.writableEnded) event.node.res.end()
+  })
   return sendStream(event, out)
 })
