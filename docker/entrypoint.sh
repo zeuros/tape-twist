@@ -9,10 +9,12 @@ cd /app
 export XDG_RUNTIME_DIR="/tmp/runtime-$(id -u)"
 mkdir -p -m 700 "$XDG_RUNTIME_DIR"
 # No default.pa: only the socket and a silent default sink (the app adds tape_twist_a/_b).
+# module-suspend-on-idle: an unused null sink would otherwise keep waking up to render silence.
 pulseaudio --daemonize=yes --exit-idle-time=-1 -n \
   --load=module-native-protocol-unix \
   --load="module-null-sink sink_name=silence" \
-  --load=module-always-sink
+  --load=module-always-sink \
+  --load=module-suspend-on-idle
 for i in 1 2 3 4 5 6 7 8 9 10; do pactl info >/dev/null 2>&1 && break; sleep 0.3; done
 
 Xvfb :99 -screen 0 1280x900x24 -nolisten tcp >/dev/null 2>&1 &

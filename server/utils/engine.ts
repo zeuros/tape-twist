@@ -63,13 +63,22 @@ class Engine {
       await ensureSinks()
       Object.assign(this.settings, await readJson<Partial<EngineSettings>>('engine.json', {}))
       await Promise.all(this.decks.map((d) => d.setVolume(0)))
-      this.timer = setInterval(() => {
-        this.tick()
-        this.reroute()
-        this.watchdog()
-      }, 500)
     })()
     return this.ready
+  }
+
+  /** The loop only runs while a deck is open: with none, the server has nothing to watch. */
+  private startLoop() {
+    this.timer ??= setInterval(() => {
+      this.tick()
+      this.reroute()
+      this.watchdog()
+    }, 500)
+  }
+
+  private stopLoop() {
+    if (this.timer) clearInterval(this.timer)
+    this.timer = null
   }
 
   /** Run fn after everything queued before it; interrupts a running fade first. */
@@ -78,12 +87,17 @@ class Engine {
     const p = this.serial.then(async () => {
       this.abortFade = false
       await this.init()
+      this.startLoop()
       return fn()
     })
-    this.serial = p.catch((e: Error) => {
-      this.error = e.message
-      console.error('[engine]', e)
-    })
+    this.serial = p
+      .catch((e: Error) => {
+        this.error = e.message
+        console.error('[engine]', e)
+      })
+      .finally(() => {
+        if (!this.decks.some((d) => d.isOpen)) this.stopLoop()
+      })
     return p
   }
 
@@ -346,7 +360,7 @@ class Engine {
   }
 
   async shutdown() {
-    if (this.timer) clearInterval(this.timer)
+    this.stopLoop()
     await Promise.all(this.decks.map((d) => d.close()))
   }
 }
