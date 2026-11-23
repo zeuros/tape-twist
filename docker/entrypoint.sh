@@ -8,6 +8,8 @@ cd /app
 
 export XDG_RUNTIME_DIR="/tmp/runtime-$(id -u)"
 mkdir -p -m 700 "$XDG_RUNTIME_DIR"
+# /tmp survives a container restart: a pid left by an unclean stop would block PulseAudio.
+rm -f "$XDG_RUNTIME_DIR/pulse/pid"
 # No default.pa: only the socket and a silent default sink (the app adds tape_twist_a/_b).
 # module-suspend-on-idle: an unused null sink would otherwise keep waking up to render silence.
 pulseaudio --daemonize=yes --exit-idle-time=-1 -n \
