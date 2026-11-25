@@ -1,0 +1,9 @@
+# Demo overrides: its own copy of the data (credentials, pads, certificate) so the recording never
+# touches the real ./data, and a throwaway PIN.
+services:
+  tape-twist:
+    environment:
+      HOST_PIN: "4242"
+    volumes: !override
+      - ./demo/data:/app/data:z
+    restart: "no"

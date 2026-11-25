@@ -7,3 +7,6 @@ data
 .nuxt-e2e
 .output-e2e
 .claude/worktrees
+demo/data
+demo/dist
+demo/work
