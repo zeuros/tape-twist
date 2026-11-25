@@ -1,6 +1,6 @@
 # Tape Twist internals
 
-How each part works, in detail. Setup is in the [README](../README.md).
+How each part works, in detail. Setup is in the [README](../README.md) and the [guide](guide.md).
 
 ## How credentials work
 
@@ -80,7 +80,7 @@ The evening list has a revision number, so two open players never silently overw
 
 ### Reaching it from outside (Tailscale Funnel)
 
-Optional (`--funnel`, see the README). `tailscale funnel --bg https+insecure://localhost:3000` publishes the app at `https://<machine>.<tailnet>.ts.net`. Anyone with that link reaches the lock screen; the API needs the host PIN. Still, turn it off after the party (`tailscale funnel reset`). A visitor who opens the ts.net link from the home Wi-Fi is sent to the LAN address (`https://192.168.1.x:3000`) so the stream doesn't go out to the internet and back: Funnel passes the visitor's address, and the server compares it with the home's public IP from `tailscale netcheck`. Set `LAN_REDIRECT=0` to turn that off. The QR button in the player header shows the player's link as a QR code: the Funnel one while `tailscale funnel status` says it's on (`funnelHost()` in `server/utils/network.ts`), else the LAN one. The same addresses are printed at start-up (`server/plugins/network.ts`).
+Optional (`--funnel`, see the [guide](guide.md)). `tailscale funnel --bg https+insecure://localhost:3000` publishes the app at `https://<machine>.<tailnet>.ts.net`. Anyone with that link reaches the lock screen; the API needs the host PIN. Still, turn it off after the party (`tailscale funnel reset`). A visitor who opens the ts.net link from the home Wi-Fi is sent to the LAN address (`https://192.168.1.x:3000`) so the stream doesn't go out to the internet and back: Funnel passes the visitor's address, and the server compares it with the home's public IP from `tailscale netcheck`. Set `LAN_REDIRECT=0` to turn that off. The QR button in the player header shows the player's link as a QR code: the Funnel one while `tailscale funnel status` says it's on (`funnelHost()` in `server/utils/network.ts`), else the LAN one. The same addresses are printed at start-up (`server/plugins/network.ts`).
 
 ## Docker
 
