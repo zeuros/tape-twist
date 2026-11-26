@@ -5,11 +5,7 @@
 <h1 align="center">Tape Twist</h1>
 <h3 align="center">Mash that sound up!</h3>
 
-<p align="center">
-  <video src="docs/demo.mp4" poster="docs/demo.jpg" controls muted width="100%">
-    <a href="docs/demo.mp4"><img src="docs/demo.jpg" alt="Watch the demo: three phones and one server" width="100%"></a>
-  </video>
-</p>
+https://github.com/user-attachments/assets/bd06244c-2526-43b5-8473-6250a03c12ca
 
 <p align="center"><b>Everyone's a DJ now!</b> Your SoundCloud and Deezer favorites, mixed live on one server and played in sync by every phone in the room.</p>
 
